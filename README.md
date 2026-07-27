@@ -93,6 +93,13 @@ agent 会在每晚：取出当天的问题 → 像咨询师一样一个个问你
 
 只要保持「看见 → 理解 → 选择」的递进，它就立得住。**欢迎 PR 你的题库变体。**
 
+### 在 Claude Code / Cowork 上私密部署
+
+在云端会话里运行？你的回答不应进入公开仓库或临时容器。见
+[`PRIVATE-DEPLOY.md`](PRIVATE-DEPLOY.md)：回答只以追加式快照（`si_snapshot.py`）
+存到**你自己的私人存储**，并有 pre-commit + CI 守卫（`scripts/privacy-guard.sh`）
+确保任何私人内容都无法被提交。
+
 ### 一句重要的话
 
 这是一面镜子，不是医生。如果你正经历持续的痛苦或危机，请寻求专业的、
@@ -160,6 +167,15 @@ review days.
 question, add a language, or fork it into a 7-day / 30-day version — as long
 as you keep the "See → Understand → Choose" progression. **PRs with your own
 variants are welcome.**
+
+### Private deployment on Claude Code / Cowork
+
+Running this in cloud sessions (Claude Code on the web, Cowork)? Your answers
+should never touch a public repo or an ephemeral container. See
+[`PRIVATE-DEPLOY.md`](PRIVATE-DEPLOY.md): answers persist only to **your own
+private storage** as append-only snapshots (`si_snapshot.py`), with a
+pre-commit + CI guard (`scripts/privacy-guard.sh`) making sure nothing
+personal can ever be committed.
 
 ### One important note
 
