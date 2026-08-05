@@ -31,8 +31,9 @@ After each night's conversation the agent:
 
 1. records your answers locally (`si.py record`),
 2. packs the **complete** state into one text snapshot (`si_snapshot.py pack`)
-   — a readable journal on top, a base64 machine-state block underneath
-   (base64 survives Google-Doc rich-text conversion), and
+   — a readable journal on top, a gzipped-and-base64 machine-state block
+   underneath (base64 survives Google-Doc rich-text conversion; gzip keeps
+   the block small as the journal grows across 21 nights), and
 3. creates a new Google Doc `si-snapshot day-NN YYYY-MM-DD` in
    `Self-Interview (Private)`, then reads it back to verify it parses.
 
