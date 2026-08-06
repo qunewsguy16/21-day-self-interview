@@ -11,7 +11,8 @@ A snapshot is a single text document with two parts:
   1. A human-readable journal (so the user can open and read it in Drive).
   2. A machine-state block: gzipped, base64-encoded JSON between BEGIN/END
      markers. Base64 survives rich-text conversion (smart quotes, reflowed
-     whitespace), so the snapshot can round-trip through a Google Doc safely;
+     whitespace, and the markdown escaping a Doc adds to line-leading
+     characters), so the snapshot can round-trip through a Google Doc safely;
      gzip keeps the block small as the journal grows across 21 nights.
 
 Format versions: v2 blocks are gzipped, v1 blocks are plain JSON. Unpacking
@@ -25,7 +26,7 @@ Usage:
 State lives in $SI_HOME or ~/.self-interview/ (same as si.py).
 Pure stdlib, no dependencies.
 """
-import argparse, base64, binascii, datetime, gzip, json, os, pathlib, re, sys
+import argparse, base64, binascii, datetime, gzip, json, os, pathlib, re, sys, zlib
 
 FORMAT = 2
 MARK_BEGIN = "-----BEGIN SI STATE (base64+gzip) v%d-----" % FORMAT
@@ -96,6 +97,18 @@ def cmd_pack(args):
     }, ensure_ascii=False))
 
 
+def _normalize(line: str) -> str:
+    """Strip a line and undo markdown escaping added by rich-text renderers.
+
+    Google Docs (read back as markdown) escapes line-leading markdown
+    characters — a base64 line starting with '+' comes back as '\\+...' — and an
+    escaped line would otherwise fail the base64 match and be dropped silently,
+    corrupting the payload. Backslash is not in the base64 alphabet, so removing
+    it is always safe.
+    """
+    return line.strip().replace("\\", "")
+
+
 def _decode(text: str) -> dict:
     begin = text.find("BEGIN SI STATE")
     end = text.find("END SI STATE")
@@ -103,14 +116,14 @@ def _decode(text: str) -> dict:
         _fail("No machine-state block found in the snapshot text.")
     begin = text.find("\n", begin)
     blob = text[begin:end]
-    b64 = "".join(ln.strip() for ln in blob.splitlines()
-                  if ln.strip() and B64_LINE.match(ln) and "-" not in ln)
+    b64 = "".join(ln for ln in map(_normalize, blob.splitlines())
+                  if ln and B64_LINE.match(ln) and "-" not in ln)
     try:
         blob = base64.b64decode(b64, validate=False)
         if blob[:2] == b"\x1f\x8b":          # gzip magic (v2); v1 blocks are plain JSON
             blob = gzip.decompress(blob)
         payload = json.loads(blob.decode("utf-8"))
-    except (ValueError, OSError, binascii.Error) as e:
+    except (ValueError, OSError, binascii.Error, zlib.error) as e:
         _fail("Machine-state block is corrupt: %s" % e)
     if "state" not in payload or "journal" not in payload:
         _fail("Snapshot payload missing state/journal keys.")
