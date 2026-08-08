@@ -31,6 +31,9 @@ import argparse, base64, binascii, datetime, gzip, json, os, pathlib, re, sys, z
 FORMAT = 2
 MARK_BEGIN = "-----BEGIN SI STATE (base64+gzip) v%d-----" % FORMAT
 MARK_END = "-----END SI STATE-----"
+PART_BEGIN = "-----BEGIN SI STATE PART %d/%d (base64+gzip) v%d-----"
+PART_END = "-----END SI STATE PART %d/%d-----"
+PART_RE = re.compile(r"BEGIN SI STATE PART (\d+)/(\d+)")
 B64_LINE = re.compile(r"^[A-Za-z0-9+/=\s]+$")
 
 
@@ -83,16 +86,44 @@ def cmd_pack(args):
     }
     blob = gzip.compress(json.dumps(payload, ensure_ascii=False).encode("utf-8"), 9)
     raw = base64.b64encode(blob).decode("ascii")
-    lines.append(MARK_BEGIN)
-    lines.extend(raw[i:i + 76] for i in range(0, len(raw), 76))
-    lines.append(MARK_END)
-    text = "\n".join(lines) + "\n"
+    b64_lines = [raw[i:i + 76] for i in range(0, len(raw), 76)]
     out = pathlib.Path(args.out) if args.out else home() / "snapshot.txt"
-    out.write_text(text, encoding="utf-8")
+    n = max(1, int(args.parts or 1))
+    if n == 1:
+        lines.append(MARK_BEGIN)
+        lines.extend(b64_lines)
+        lines.append(MARK_END)
+        out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        written = [str(out)]
+    else:
+        # Split the machine state across N files. Parts carry state ONLY — no
+        # readable journal — so every part stays small. That matters when the
+        # parts are transferred by hand or by an agent: a slip in prose is
+        # harmless, a slip inside base64 destroys the whole payload, so the
+        # fragile content is kept small, uniform, and separately checkable.
+        # Use `pack` without --parts for the single readable+state document.
+        per = -(-len(b64_lines) // n)
+        written = []
+        for i in range(n):
+            chunk = b64_lines[i * per:(i + 1) * per]
+            head = [
+                "21 Days of Self-Interview — machine state part %d of %d" % (i + 1, n),
+                "%d night(s) recorded · saved %s" % (len(journal), payload["saved_at"]),
+                "This document is private. Do not share it or commit it to any repository.",
+                "Restore needs every part:",
+                "  si_snapshot.py unpack" + "".join(" --file part%d" % (k + 1) for k in range(n)),
+                "",
+            ]
+            body = head + [PART_BEGIN % (i + 1, n, FORMAT)] + chunk + [PART_END % (i + 1, n)]
+            p = out.with_name("%s.part%dof%d%s" % (out.stem, i + 1, n, out.suffix))
+            p.write_text("\n".join(body) + "\n", encoding="utf-8")
+            written.append(str(p))
     print(json.dumps({
         "ok": True,
         "title": _title(state, journal),
-        "out": str(out),
+        "out": written if len(written) > 1 else written[0],
+        "parts": n,
+        "b64_lines": len(b64_lines),
         "days_recorded": sorted(int(k) for k in journal.keys()),
     }, ensure_ascii=False))
 
@@ -109,15 +140,40 @@ def _normalize(line: str) -> str:
     return line.strip().replace("\\", "")
 
 
-def _decode(text: str) -> dict:
+def _block(text: str):
+    """Return (part_index, part_total, base64) for one snapshot text."""
     begin = text.find("BEGIN SI STATE")
     end = text.find("END SI STATE")
     if begin < 0 or end < 0 or end <= begin:
         _fail("No machine-state block found in the snapshot text.")
-    begin = text.find("\n", begin)
-    blob = text[begin:end]
-    b64 = "".join(ln for ln in map(_normalize, blob.splitlines())
+    m = PART_RE.search(text, begin)
+    idx, total = (int(m.group(1)), int(m.group(2))) if m else (1, 1)
+    body = text[text.find("\n", begin):end]
+    b64 = "".join(ln for ln in map(_normalize, body.splitlines())
                   if ln and B64_LINE.match(ln) and "-" not in ln)
+    return idx, total, b64
+
+
+def _decode(texts) -> dict:
+    if isinstance(texts, str):
+        texts = [texts]
+    blocks = [_block(t) for t in texts]
+    total = blocks[0][1]
+    if any(b[1] != total for b in blocks):
+        _fail("Snapshot parts disagree on how many parts there are.")
+    if total == 1:
+        b64 = blocks[0][2]
+    else:
+        seen = {}
+        for idx, _, chunk in blocks:
+            if idx in seen:
+                _fail("Snapshot part %d was supplied more than once." % idx)
+            seen[idx] = chunk
+        missing = [i for i in range(1, total + 1) if i not in seen]
+        if missing:
+            _fail("Missing snapshot part(s) %s of %d — restore needs all of them."
+                  % (", ".join(map(str, missing)), total))
+        b64 = "".join(seen[i] for i in range(1, total + 1))
     try:
         blob = base64.b64decode(b64, validate=False)
         if blob[:2] == b"\x1f\x8b":          # gzip magic (v2); v1 blocks are plain JSON
@@ -130,10 +186,10 @@ def _decode(text: str) -> dict:
     return payload
 
 
-def _read_input(args) -> str:
+def _read_input(args):
     if args.file:
-        return pathlib.Path(args.file).read_text(encoding="utf-8")
-    return sys.stdin.read()
+        return [pathlib.Path(f).read_text(encoding="utf-8") for f in args.file]
+    return [sys.stdin.read()]
 
 
 def cmd_unpack(args):
@@ -179,14 +235,18 @@ def main():
 
     p = sub.add_parser("pack", help="write snapshot text from local state")
     p.add_argument("--out", help="output file (default: $SI_HOME/snapshot.txt)")
+    p.add_argument("--parts", type=int, default=1,
+                   help="split the machine state across N files (default: 1)")
     p.set_defaults(func=cmd_pack)
 
     p = sub.add_parser("unpack", help="restore local state from snapshot text")
-    p.add_argument("--file", help="snapshot text file (default: stdin)")
+    p.add_argument("--file", action="append",
+                   help="snapshot text file; repeat once per part (default: stdin)")
     p.set_defaults(func=cmd_unpack)
 
     p = sub.add_parser("info", help="inspect a snapshot without writing anything")
-    p.add_argument("--file", help="snapshot text file (default: stdin)")
+    p.add_argument("--file", action="append",
+                   help="snapshot text file; repeat once per part (default: stdin)")
     p.set_defaults(func=cmd_info)
 
     args = ap.parse_args()

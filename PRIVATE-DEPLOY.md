@@ -42,6 +42,24 @@ At the start of any session, the *newest* snapshot is restored with
 stale cache or an out-of-order restore can't lose answers. Older snapshots
 are your automatic backup history; delete them only by hand, only if you want to.
 
+### Splitting the state (`--parts`)
+
+The machine-state block grows with the journal, and transferring one long
+base64 blob by hand — or by an agent typing it into a document — is exactly
+where transfers break: a slip in prose is harmless, a single dropped character
+inside base64 destroys the whole payload. So:
+
+```bash
+python3 si_snapshot.py pack --parts 5        # snapshot.part1of5.txt … part5of5.txt
+python3 si_snapshot.py unpack --file p1 --file p2 --file p3 --file p4 --file p5
+```
+
+Split parts carry **state only**, no journal prose, so each stays small and can
+be verified on its own. Order doesn't matter; a missing part fails loudly
+rather than restoring something incomplete. Keep the readable write-up in its
+own document alongside them. Plain `pack` (no `--parts`) still produces the
+single readable-plus-state snapshot, and `unpack` still accepts it.
+
 ## Setup (once)
 
 ```bash
