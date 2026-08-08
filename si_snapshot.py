@@ -29,6 +29,7 @@ Pure stdlib, no dependencies.
 import argparse, base64, binascii, datetime, gzip, json, os, pathlib, re, sys, zlib
 
 FORMAT = 2
+SI_VERSION = "1.0.0"                     # must track si.py's VERSION
 MARK_BEGIN = "-----BEGIN SI STATE (base64+gzip) v%d-----" % FORMAT
 MARK_END = "-----END SI STATE-----"
 PART_BEGIN = "-----BEGIN SI STATE PART %d/%d (base64+gzip) v%d-----"
@@ -204,7 +205,11 @@ def _decode_readable(text: str) -> dict:
     return {
         "format": "readable",
         "saved_at": max(e["date"] for e in journal.values()) + "T00:00:00",
-        "state": {"start_date": start_date, "lang": lang,
+        # Carry every key si.py expects. A prose restore is a real restore, not
+        # a degraded one — state rebuilt this way must behave identically, or
+        # the fallback path only fails once you are already relying on it.
+        "state": {"version": SI_VERSION, "lang": lang, "start_date": start_date,
+                  "created_at": start_date + "T00:00:00",
                   "completed_days": sorted(int(k) for k in journal)},
         "journal": journal,
     }
