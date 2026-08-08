@@ -158,6 +158,7 @@ def _normalize(line: str) -> str:
 
 
 HEADER_RE = re.compile(r"Started\s+(\d{4}-\d{2}-\d{2})\s*[·.]\s*language\s+(\w+)")
+MD_ESCAPE = re.compile(r"\\([\\`*_{}\[\]()#+\-.!<>|~])")
 DAY_RE = re.compile(r"^\\?-{2,}\s*Day\s+(\d+)\s*[·.]\s*(.+?)\s*\((\d{4}-\d{2}-\d{2})\)\s*-{2,}\s*$")
 
 
@@ -176,8 +177,13 @@ def _decode_readable(text: str) -> dict:
     journal, day, buf = {}, None, []
 
     def flush():
-        if day is not None:
-            journal[str(day["day"])] = dict(day, answers="\n".join(buf).strip())
+        if day is None:
+            return
+        body = "\n".join(buf)
+        body = MD_ESCAPE.sub(r"\1", body)          # \[ \< \_ … from markdown rendering
+        body = re.sub(r"[ \t ]+$", "", body, flags=re.M)
+        body = re.sub(r"\n{3,}", "\n\n", body)     # Docs doubles every newline
+        journal[str(day["day"])] = dict(day, answers=body.strip())
 
     for raw in text.splitlines():
         line = raw.rstrip()
