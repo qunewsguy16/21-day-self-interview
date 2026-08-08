@@ -311,6 +311,48 @@ def cmd_info(args):
     }, ensure_ascii=False))
 
 
+def _squash(s: str) -> str:
+    return re.sub(r"\s+", " ", s or "").strip()
+
+
+def cmd_verify(args):
+    """Compare a snapshot (usually just read back out of storage) to local state.
+
+    The point is to make "did the save actually work?" a mechanical check with
+    an exit code, not a judgement call. Whoever wrote the snapshot — a human
+    copying text, an agent emitting it into a tool call — cannot be trusted to
+    confirm their own transfer, because the failure mode is producing something
+    that *looks* right. So diff it against the source and let the machine say.
+    """
+    payload = _decode(_read_input(args))
+    remote = payload["journal"]
+    local = _load(home() / "journal.json") or {}
+    if not local:
+        _fail("No local journal to verify against.")
+    missing, differs, ok = [], [], []
+    for k in sorted(local, key=int):
+        if k not in remote:
+            missing.append(int(k))
+        elif _squash(local[k].get("answers")) != _squash(remote[k].get("answers")):
+            a, b = _squash(local[k].get("answers")), _squash(remote[k].get("answers"))
+            differs.append({"day": int(k), "local_chars": len(a), "snapshot_chars": len(b)})
+        else:
+            ok.append(int(k))
+    extra = sorted(int(k) for k in remote if k not in local)
+    good = not missing and not differs
+    print(json.dumps({
+        "ok": good,
+        "msg": "Snapshot matches local state." if good
+               else "SNAPSHOT DOES NOT MATCH LOCAL STATE — do not rely on it.",
+        "verified_days": ok,
+        "missing_days": missing,
+        "differing_days": differs,
+        "extra_days_in_snapshot": extra,
+    }, ensure_ascii=False))
+    if not good:
+        sys.exit(1)
+
+
 def main():
     ap = argparse.ArgumentParser(prog="si_snapshot.py",
                                  description="Pack/unpack private snapshots of self-interview state")
@@ -333,6 +375,11 @@ def main():
     p.add_argument("--file", action="append",
                    help="snapshot text file; repeat once per part (default: stdin)")
     p.set_defaults(func=cmd_info)
+
+    p = sub.add_parser("verify", help="check a saved snapshot against local state (exit 1 on loss)")
+    p.add_argument("--file", action="append",
+                   help="snapshot text file; repeat once per part (default: stdin)")
+    p.set_defaults(func=cmd_verify)
 
     args = ap.parse_args()
     args.func(args)

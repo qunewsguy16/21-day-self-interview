@@ -66,14 +66,30 @@ TZ=America/New_York python3 si.py prompt
    `TZ=America/New_York python3 si.py record --day N --file <tmpfile>`
    (their words, lightly organized — not your interpretation). Prefer
    `--file` over `--text` to avoid shell-quoting damage.
-5. **Snapshot.** `TZ=America/New_York python3 si_snapshot.py pack` → returns
-   a suggested `title` and the snapshot file path. Create a Google Doc in
-   `Self-Interview (Private)` with that title and the file's text (allow the
-   default conversion to a Google Doc so it stays searchable and readable).
-   Create the folder first if it doesn't exist.
-6. **Verify.** Read the new doc back and confirm `si_snapshot.py info`
-   parses it (round-trip check). Only then tell the user the night is saved —
-   show them the `si.py status` progress bar.
+5. **Snapshot.** `TZ=America/New_York python3 si_snapshot.py pack --readable`
+   → prose only, no base64. Create a Google Doc in `Self-Interview (Private)`
+   with the returned `title` and that text. Create the folder if needed.
+
+   **Never hand-copy a base64 machine-state block into a tool call.** You
+   cannot reproduce high-entropy text reliably; a single wrong character
+   destroys the entire payload, and the failure looks like success. The
+   readable format exists precisely so that a slip costs one character
+   instead of the whole journal. If you catch yourself typing base64, stop.
+
+   Nightly docs may carry only that night's entry (`unpack` merges readable
+   files by day, so pass every night's doc when restoring). On recap nights
+   (7/14/21) also write one consolidated `pack --readable` doc containing all
+   nights, so a single document can always restore everything.
+6. **Verify — mechanically, never by eye.** Read the new doc back, save the
+   text, and run:
+   `TZ=America/New_York python3 si_snapshot.py verify --file <readback>`
+   (repeat `--file` for every doc needed to make the journal whole). It exits
+   non-zero and names the missing or differing days. **Only an `ok: true`
+   from `verify` means the night is saved.** Do not tell the user it saved
+   because the upload call returned success — it returns success for
+   truncated and even fabricated content. If verify fails, say so plainly,
+   say the night is not yet backed up, and fix it before moving on.
+   Then show the `si.py status` progress bar.
 
 ## If things look wrong
 
