@@ -210,6 +210,22 @@ def _decode_readable(text: str) -> dict:
     }
 
 
+def _merge_payloads(payloads) -> dict:
+    """Union the journals of several payloads; newest recording of a day wins."""
+    journal = {}
+    for p in payloads:
+        for k, e in p["journal"].items():
+            cur = journal.get(k)
+            if cur is None or (e.get("recorded_at") or e.get("date", "")) > \
+                              (cur.get("recorded_at") or cur.get("date", "")):
+                journal[k] = e
+    state = dict(payloads[0]["state"])
+    state["completed_days"] = sorted(int(k) for k in journal)
+    return {"format": payloads[0].get("format", FORMAT), "state": state,
+            "journal": journal,
+            "saved_at": max(p.get("saved_at", "") for p in payloads)}
+
+
 def _block(text: str):
     """Return (part_index, part_total, base64) for one snapshot text."""
     begin = text.find("BEGIN SI STATE")
@@ -227,25 +243,22 @@ def _block(text: str):
 def _decode(texts) -> dict:
     if isinstance(texts, str):
         texts = [texts]
-    if not any("BEGIN SI STATE" in t for t in texts):
-        # Readable snapshots merge by day, so a night can live in its own small
-        # document and a restore is just "hand me all of them".
-        payloads = [_decode_readable(t) for t in texts]
-        journal = {}
-        for p in payloads:
-            for k, e in p["journal"].items():
-                if k not in journal or e["date"] > journal[k]["date"]:
-                    journal[k] = e
-        state = payloads[0]["state"]
-        state["completed_days"] = sorted(int(k) for k in journal)
-        return {"format": "readable", "state": state, "journal": journal,
-                "saved_at": max(p["saved_at"] for p in payloads)}
+    # A folder of snapshots can hold both kinds at once — older base64 docs and
+    # newer prose ones — so decode each kind on its own terms and merge by day.
+    prose = [t for t in texts if "BEGIN SI STATE" not in t]
+    texts = [t for t in texts if "BEGIN SI STATE" in t]
+    payloads = [_decode_readable(t) for t in prose]
+    if not texts:
+        if not payloads:
+            _fail("No snapshot text supplied.")
+        return _merge_payloads(payloads)
     blocks = [_block(t) for t in texts]
     total = blocks[0][1]
     if any(b[1] != total for b in blocks):
         _fail("Snapshot parts disagree on how many parts there are.")
     if total == 1:
-        b64 = blocks[0][2]
+        # Each is a complete snapshot in its own right; decode and merge them.
+        b64s = [b[2] for b in blocks]
     else:
         seen = {}
         for idx, _, chunk in blocks:
@@ -256,17 +269,19 @@ def _decode(texts) -> dict:
         if missing:
             _fail("Missing snapshot part(s) %s of %d — restore needs all of them."
                   % (", ".join(map(str, missing)), total))
-        b64 = "".join(seen[i] for i in range(1, total + 1))
-    try:
-        blob = base64.b64decode(b64, validate=False)
-        if blob[:2] == b"\x1f\x8b":          # gzip magic (v2); v1 blocks are plain JSON
-            blob = gzip.decompress(blob)
-        payload = json.loads(blob.decode("utf-8"))
-    except (ValueError, OSError, binascii.Error, zlib.error) as e:
-        _fail("Machine-state block is corrupt: %s" % e)
-    if "state" not in payload or "journal" not in payload:
-        _fail("Snapshot payload missing state/journal keys.")
-    return payload
+        b64s = ["".join(seen[i] for i in range(1, total + 1))]
+    for b64 in b64s:
+        try:
+            blob = base64.b64decode(b64, validate=False)
+            if blob[:2] == b"\x1f\x8b":      # gzip magic (v2); v1 blocks are plain JSON
+                blob = gzip.decompress(blob)
+            payload = json.loads(blob.decode("utf-8"))
+        except (ValueError, OSError, binascii.Error, zlib.error) as e:
+            _fail("Machine-state block is corrupt: %s" % e)
+        if "state" not in payload or "journal" not in payload:
+            _fail("Snapshot payload missing state/journal keys.")
+        payloads.append(payload)
+    return payloads[0] if len(payloads) == 1 else _merge_payloads(payloads)
 
 
 def _read_input(args):
