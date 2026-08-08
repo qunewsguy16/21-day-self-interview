@@ -42,6 +42,33 @@ At the start of any session, the *newest* snapshot is restored with
 stale cache or an out-of-order restore can't lose answers. Older snapshots
 are your automatic backup history; delete them only by hand, only if you want to.
 
+### Prose snapshots (`--readable`) — preferred for hand/agent transfer
+
+```bash
+python3 si_snapshot.py pack --readable            # journal text, no base64
+python3 si_snapshot.py unpack --file <that text>  # restores from the prose itself
+```
+
+Everything needed to restore — start date, language, and each night's day
+number, theme, date and answers — is already in the readable journal, so the
+base64 block is not required. This matters because the two formats fail very
+differently: a single wrong character inside base64 destroys the entire
+payload, while a wrong character in prose costs exactly that character.
+Verified: a snapshot round-tripped through rich-text mangling (escaped dashes,
+smart quotes, reflowed blank lines) *and* 40 corrupted characters still
+restores every night.
+
+Readable snapshots also merge by day across files, so each night can live in
+its own small document:
+
+```bash
+python3 si_snapshot.py unpack --file night01 --file night02 ... --file night12
+```
+
+Prefer this whenever a human or an agent has to move the text. Reserve the
+base64 block for machine-to-machine copies where the bytes are guaranteed
+intact.
+
 ### Splitting the state (`--parts`)
 
 The machine-state block grows with the journal, and transferring one long

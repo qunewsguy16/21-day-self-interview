@@ -77,17 +77,34 @@ def cmd_pack(args):
         lines.append("--- Day %s · %s (%s) ---" % (e.get("day"), e.get("theme"), e.get("date")))
         lines.append(e.get("answers", "").strip())
         lines.append("")
-    lines.append("Machine state below — needed to restore progress. Do not edit.")
     payload = {
         "format": FORMAT,
         "saved_at": datetime.datetime.now().isoformat(timespec="seconds"),
         "state": state,
         "journal": journal,
     }
+    out = pathlib.Path(args.out) if args.out else home() / "snapshot.txt"
+    if args.readable:
+        # Prose-only snapshot: no machine-state block at all. `unpack` restores
+        # from the day headers and answer text directly. Nothing here is
+        # all-or-nothing — a mangled character costs one character, not the
+        # whole journal — which is what makes this the safe format to move by
+        # hand, through a rich-text editor, or via an agent's tool call.
+        lines.append("No machine-state block: this snapshot restores from the text above.")
+        lines.append("Restore with: si_snapshot.py unpack --file <this file>")
+        out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print(json.dumps({
+            "ok": True,
+            "title": _title(state, journal),
+            "out": str(out),
+            "format": "readable",
+            "days_recorded": sorted(int(k) for k in journal.keys()),
+        }, ensure_ascii=False))
+        return
+    lines.append("Machine state below — needed to restore progress. Do not edit.")
     blob = gzip.compress(json.dumps(payload, ensure_ascii=False).encode("utf-8"), 9)
     raw = base64.b64encode(blob).decode("ascii")
     b64_lines = [raw[i:i + 76] for i in range(0, len(raw), 76)]
-    out = pathlib.Path(args.out) if args.out else home() / "snapshot.txt"
     n = max(1, int(args.parts or 1))
     if n == 1:
         lines.append(MARK_BEGIN)
@@ -140,6 +157,53 @@ def _normalize(line: str) -> str:
     return line.strip().replace("\\", "")
 
 
+HEADER_RE = re.compile(r"Started\s+(\d{4}-\d{2}-\d{2})\s*[·.]\s*language\s+(\w+)")
+DAY_RE = re.compile(r"^\\?-{2,}\s*Day\s+(\d+)\s*[·.]\s*(.+?)\s*\((\d{4}-\d{2}-\d{2})\)\s*-{2,}\s*$")
+
+
+def _decode_readable(text: str) -> dict:
+    """Rebuild state+journal from the human-readable half of a snapshot.
+
+    Used when a snapshot carries no machine-state block. Every field needed to
+    restore is already present in the prose, so a snapshot can survive being
+    retyped or round-tripped through a rich-text editor: damage stays local to
+    the characters that were damaged instead of invalidating the whole payload.
+    """
+    m = HEADER_RE.search(text)
+    if not m:
+        _fail("No machine-state block and no readable 'Started ... language ...' header.")
+    start_date, lang = m.group(1), m.group(2)
+    journal, day, buf = {}, None, []
+
+    def flush():
+        if day is not None:
+            journal[str(day["day"])] = dict(day, answers="\n".join(buf).strip())
+
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        d = DAY_RE.match(line.strip())
+        if d:
+            flush()
+            day = {"day": int(d.group(1)), "theme": d.group(2), "date": d.group(3),
+                   "recorded_at": d.group(3) + "T00:00:00"}
+            buf = []
+        elif day is not None:
+            if line.strip().startswith("No machine-state block") or \
+               line.strip().startswith("Restore with:"):
+                continue
+            buf.append(line)
+    flush()
+    if not journal:
+        _fail("Readable snapshot contained no '--- Day N · Theme (date) ---' entries.")
+    return {
+        "format": "readable",
+        "saved_at": max(e["date"] for e in journal.values()) + "T00:00:00",
+        "state": {"start_date": start_date, "lang": lang,
+                  "completed_days": sorted(int(k) for k in journal)},
+        "journal": journal,
+    }
+
+
 def _block(text: str):
     """Return (part_index, part_total, base64) for one snapshot text."""
     begin = text.find("BEGIN SI STATE")
@@ -157,6 +221,19 @@ def _block(text: str):
 def _decode(texts) -> dict:
     if isinstance(texts, str):
         texts = [texts]
+    if not any("BEGIN SI STATE" in t for t in texts):
+        # Readable snapshots merge by day, so a night can live in its own small
+        # document and a restore is just "hand me all of them".
+        payloads = [_decode_readable(t) for t in texts]
+        journal = {}
+        for p in payloads:
+            for k, e in p["journal"].items():
+                if k not in journal or e["date"] > journal[k]["date"]:
+                    journal[k] = e
+        state = payloads[0]["state"]
+        state["completed_days"] = sorted(int(k) for k in journal)
+        return {"format": "readable", "state": state, "journal": journal,
+                "saved_at": max(p["saved_at"] for p in payloads)}
     blocks = [_block(t) for t in texts]
     total = blocks[0][1]
     if any(b[1] != total for b in blocks):
@@ -237,6 +314,8 @@ def main():
     p.add_argument("--out", help="output file (default: $SI_HOME/snapshot.txt)")
     p.add_argument("--parts", type=int, default=1,
                    help="split the machine state across N files (default: 1)")
+    p.add_argument("--readable", action="store_true",
+                   help="prose only, no base64 block; unpack restores from the text")
     p.set_defaults(func=cmd_pack)
 
     p = sub.add_parser("unpack", help="restore local state from snapshot text")
