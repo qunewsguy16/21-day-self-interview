@@ -159,7 +159,12 @@ def _normalize(line: str) -> str:
 
 
 HEADER_RE = re.compile(r"Started\s+(\d{4}-\d{2}-\d{2})\s*[·.]\s*language\s+(\w+)")
-MD_ESCAPE = re.compile(r"\\([\\`*_{}\[\]()#+\-.!<>|~])")
+# Every ASCII punctuation mark is escapable in markdown, and renderers escape
+# whichever ones they please: Google Docs leaves '=' alone mid-line but writes
+# '\=' when a line starts with it, which used to survive decoding as a stray
+# backslash and fail `verify` by one character. Match the full CommonMark set
+# so no future line-leading punctuation can reopen this.
+MD_ESCAPE = re.compile(r"""\\([!"\#$%&'()*+,\-./:;<=>?@\[\\\]^_`{|}~])""")
 DAY_RE = re.compile(r"^\\?-{2,}\s*Day\s+(\d+)\s*[·.]\s*(.+?)\s*\((\d{4}-\d{2}-\d{2})\)\s*-{2,}\s*$")
 
 
