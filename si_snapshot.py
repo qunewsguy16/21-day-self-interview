@@ -56,6 +56,26 @@ def _fail(msg: str):
     sys.exit(1)
 
 
+ASTRAL_ESCAPE = re.compile(r"\\U([0-9A-Fa-f]{8})")
+
+
+def _escape_astral(text: str) -> str:
+    """Render characters outside the BMP as \\UXXXXXXXX escapes.
+
+    Google Docs decodes an uploaded document's bytes as latin-1 somewhere on
+    ingest, so a 4-byte character — every emoji — comes back as four mojibake
+    characters and `verify` reports the day as differing. Everything up to
+    3 bytes survives intact, so only the astral plane needs escaping. The
+    escape is plain ASCII, `unpack` turns it back into the real character, and
+    the user's own words stay byte-exact through the round trip.
+    """
+    return "".join(c if ord(c) <= 0xFFFF else "\\U%08X" % ord(c) for c in text)
+
+
+def _unescape_astral(text: str) -> str:
+    return ASTRAL_ESCAPE.sub(lambda m: chr(int(m.group(1), 16)), text)
+
+
 def _title(state: dict, journal: dict) -> str:
     last = max((int(k) for k in journal.keys()), default=0)
     stamp = datetime.date.today().isoformat()
@@ -76,7 +96,7 @@ def cmd_pack(args):
     for k in sorted(journal, key=int):
         e = journal[k]
         lines.append("--- Day %s · %s (%s) ---" % (e.get("day"), e.get("theme"), e.get("date")))
-        lines.append(e.get("answers", "").strip())
+        lines.append(_escape_astral(e.get("answers", "").strip()))
         lines.append("")
     payload = {
         "format": FORMAT,
@@ -189,6 +209,7 @@ def _decode_readable(text: str) -> dict:
         body = MD_ESCAPE.sub(r"\1", body)          # \[ \< \_ … from markdown rendering
         body = re.sub(r"[ \t ]+$", "", body, flags=re.M)
         body = re.sub(r"\n{3,}", "\n\n", body)     # Docs doubles every newline
+        body = _unescape_astral(body)              # \U0001F923 → the emoji it stands for
         journal[str(day["day"])] = dict(day, answers=body.strip())
 
     for raw in text.splitlines():
