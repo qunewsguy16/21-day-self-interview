@@ -3,6 +3,13 @@
 *.backup.*.json
 state.json
 journal.json
+snapshot.txt
+si-snapshot*
+answers*
+*.answers.*
+
+# Claude Code local settings (may contain machine-specific paths)
+.claude/settings.local.json
 
 # Python
 __pycache__/
