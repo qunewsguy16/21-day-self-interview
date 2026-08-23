@@ -1,6 +1,6 @@
 ---
 name: self-interview
-description: Run the nightly 21-day self-interview in Claude Code / Cowork with private persistence. Use when a nightly routine fires for the self-interview, when the user says "start my self-interview" / "tonight's questions" / asks about interview progress, or when restoring or saving self-interview state. The user's answers are private — they persist ONLY to the user's own storage (Google Drive snapshot doc), never to git.
+description: Run the nightly 21-day self-interview in Claude Code / Cowork with private persistence. Use when a nightly routine fires for the self-interview, when the user says "start my self-interview" / "tonight's questions" / asks about interview progress, or when restoring or saving self-interview state. Supports the classic track and the healing track (references/healing.md). The user's answers are private — they persist ONLY to the user's own storage (Google Drive snapshot doc), never to git.
 ---
 
 # Self-Interview — Claude Code / Cowork deployment
@@ -31,8 +31,12 @@ or any other outward-facing surface.
 
 ## Where state lives
 
-- **Canonical:** Google Drive folder **`Self-Interview (Private)`**, one
-  snapshot Google Doc per night, named `si-snapshot day-NN YYYY-MM-DD`.
+- **Canonical:** Google Drive folder **`Self-Interview (Private)`** (or a
+  per-run subfolder the user designates), one snapshot Google Doc per night.
+  Titles come from `si_snapshot.py pack` and are track-specific —
+  `si-snapshot day-NN YYYY-MM-DD` for the classic track,
+  `si-<track>-snapshot night-NN YYYY-MM-DD` for others (e.g.
+  `si-healing-snapshot night-03 ...`) — so two runs never mix on restore.
   Append-only: the newest doc always contains the complete state (readable
   journal on top, machine-state block underneath). Older snapshots are
   automatic history; never delete them on your own.
@@ -50,13 +54,16 @@ TZ=America/New_York python3 si.py prompt
 
 ## Nightly flow
 
-1. **Restore.** Drive-search `title contains 'si-snapshot'` (scope to the
-   folder via `parentId` when known; newest `modifiedTime` wins). Read the
-   doc, save its text to a temp file, then:
+1. **Restore.** Drive-search by the run's title prefix — `si-snapshot` for a
+   classic run, `si-<track>-snapshot` for others — scoped to the folder via
+   `parentId` when known; newest `modifiedTime` wins. Read the doc, save its
+   text to a temp file, then:
    `TZ=America/New_York python3 si_snapshot.py unpack --file <tmp>`.
+   (Per-night prose docs restore together: repeat `--file` for each.)
    Unpack merges by day and keeps the latest recording on conflict, so
    restoring over an existing cache is safe. No snapshot found AND no local
-   state → ask the user whether to `si.py init` (which language, start date).
+   state → ask the user whether to `si.py init` (which language, track,
+   start date) — unless the routine's own prompt already specifies the init.
 2. **Prompt.** `TZ=America/New_York python3 si.py prompt` — never invent day
    numbers or questions. On reflection days (7/14/21) run `si.py recap` first
    and open by reflecting the user's own words (root SKILL.md, Principle 3).
@@ -90,6 +97,26 @@ TZ=America/New_York python3 si.py prompt
    truncated and even fabricated content. If verify fails, say so plainly,
    say the night is not yet backed up, and fix it before moving on.
    Then show the `si.py status` progress bar.
+
+## Healing track — additional rules
+
+When `si.py prompt` reports `"track": "healing"`, the run follows
+`references/healing.md` in full. The short version, mechanically:
+
+- **Read `references/healing.md` before conversing.** Its conduct rules
+  (capacity check, titration, no excavation, no guilt levers) override any
+  general instinct to dig deeper.
+- The prompt JSON may carry `consent_gate`, `gentle_alt`, and `closing`.
+  Deliver the consent gate *before* the theme; the gentle_alt **counts as the
+  full night**; always end on the closing's grounding, in the present.
+- Pacing is `nights`: the day number is the next unrecorded night, so a
+  skipped evening creates no debt. `already_answered_today` means a night was
+  already recorded *this evening* — check in warmly and stop; never push a
+  second night in one sitting, and never run a consent-gated night as a
+  same-evening second night even if asked (offer it for tomorrow).
+- Reflection nights are 7, 14, 21, as ever: `recap` first, reflect the
+  user's own words back, and write a consolidated `pack --readable` doc.
+- Real distress → `references/safety.md`, immediately and without weighing it.
 
 ## If things look wrong
 

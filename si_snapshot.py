@@ -79,6 +79,11 @@ def _unescape_astral(text: str) -> str:
 def _title(state: dict, journal: dict) -> str:
     last = max((int(k) for k in journal.keys()), default=0)
     stamp = datetime.date.today().isoformat()
+    track = state.get("track", "classic")
+    if track != "classic":
+        # A second run's snapshots must not collide with the first run's
+        # "si-snapshot day-NN" docs — searches restore by title prefix.
+        return "si-%s-snapshot night-%02d %s" % (track, last, stamp)
     return "si-snapshot day-%02d %s" % (last, stamp)
 
 
@@ -89,8 +94,12 @@ def cmd_pack(args):
         _fail("No local state to pack. Run `si.py init` (or unpack a snapshot) first.")
     lines = []
     lines.append("21 Days of Self-Interview — private journal snapshot")
-    lines.append("Started %s · language %s · %d night(s) recorded"
-                 % (state.get("start_date"), state.get("lang"), len(journal)))
+    # track and pace ride in the header so a prose-only restore rebuilds the
+    # complete state; older snapshots without them decode as classic/calendar.
+    lines.append("Started %s · language %s · track %s · pace %s · %d night(s) recorded"
+                 % (state.get("start_date"), state.get("lang"),
+                    state.get("track", "classic"), state.get("pace", "calendar"),
+                    len(journal)))
     lines.append("This document is private. Do not share it or commit it to any repository.")
     lines.append("")
     for k in sorted(journal, key=int):
@@ -178,7 +187,10 @@ def _normalize(line: str) -> str:
     return line.strip().replace("\\", "")
 
 
-HEADER_RE = re.compile(r"Started\s+(\d{4}-\d{2}-\d{2})\s*[·.]\s*language\s+(\w+)")
+HEADER_RE = re.compile(
+    r"Started\s+(\d{4}-\d{2}-\d{2})\s*[·.]\s*language\s+(\w+)"
+    r"(?:\s*[·.]\s*track\s+(\w+))?(?:\s*[·.]\s*pace\s+(\w+))?")
+NIGHTS_RE = re.compile(r"(\d+)\s+night\(?s?\)?\s+recorded")
 # Every ASCII punctuation mark is escapable in markdown, and renderers escape
 # whichever ones they please: Google Docs leaves '=' alone mid-line but writes
 # '\=' when a line starts with it, which used to survive decoding as a stray
@@ -200,6 +212,8 @@ def _decode_readable(text: str) -> dict:
     if not m:
         _fail("No machine-state block and no readable 'Started ... language ...' header.")
     start_date, lang = m.group(1), m.group(2)
+    track = m.group(3) or "classic"
+    pace = m.group(4) or ("nights" if track != "classic" else "calendar")
     journal, day, buf = {}, None, []
 
     def flush():
@@ -227,14 +241,21 @@ def _decode_readable(text: str) -> dict:
             buf.append(line)
     flush()
     if not journal:
-        _fail("Readable snapshot contained no '--- Day N · Theme (date) ---' entries.")
+        # A night-00 bootstrap doc legitimately has no entries yet — its header
+        # says so. Anything else with no parseable entries is a mangled doc,
+        # and restoring "nothing" from it silently would be data loss.
+        nm = NIGHTS_RE.search(text)
+        if not (nm and int(nm.group(1)) == 0):
+            _fail("Readable snapshot contained no '--- Day N · Theme (date) ---' entries.")
     return {
         "format": "readable",
-        "saved_at": max(e["date"] for e in journal.values()) + "T00:00:00",
+        "saved_at": (max(e["date"] for e in journal.values()) if journal
+                     else start_date) + "T00:00:00",
         # Carry every key si.py expects. A prose restore is a real restore, not
         # a degraded one — state rebuilt this way must behave identically, or
         # the fallback path only fails once you are already relying on it.
-        "state": {"version": SI_VERSION, "lang": lang, "start_date": start_date,
+        "state": {"version": SI_VERSION, "lang": lang, "track": track,
+                  "pace": pace, "start_date": start_date,
                   "created_at": start_date + "T00:00:00",
                   "completed_days": sorted(int(k) for k in journal)},
         "journal": journal,
@@ -340,6 +361,7 @@ def cmd_unpack(args):
         "msg": "State restored.",
         "start_date": snap_state.get("start_date"),
         "lang": snap_state.get("lang"),
+        "track": snap_state.get("track", "classic"),
         "days_recorded": snap_state["completed_days"],
         "saved_at": payload.get("saved_at"),
     }, ensure_ascii=False))

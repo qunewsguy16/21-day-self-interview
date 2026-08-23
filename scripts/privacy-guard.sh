@@ -19,7 +19,7 @@ else
 fi
 [ -z "$FILES" ] && { echo "privacy-guard: nothing to check."; exit 0; }
 
-FORBIDDEN_NAME='(^|/)(state\.json|journal\.json|journal\.backup\.[^/]*|snapshot\.txt)$|(^|/)\.self-interview(/|$)|si-snapshot|(^|/)answers[^/]*$'
+FORBIDDEN_NAME='(^|/)(state\.json|journal\.json|journal\.backup\.[^/]*|snapshot\.txt)$|(^|/)\.self-interview(/|$)|si-([a-z]+-)?snapshot|(^|/)answers[^/]*$'
 # Files allowed to mention the machine-state marker (they define/document it).
 CONTENT_ALLOWLIST='^(si_snapshot\.py|scripts/privacy-guard\.sh)$'
 MARKER='BEGIN SI STATE'

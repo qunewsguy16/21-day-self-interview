@@ -142,6 +142,20 @@ pretty, hollow answers. Draws on existential psychology (Yalom, Frankl),
 Socratic questioning, mindful observation, narrative therapy, and habit
 science. See [`references/method.md`](references/method.md).
 
+#### The healing track
+
+`questions.healing.en.json` is an alternate 21-night bank for working
+through the long aftermath of a difficult childhood or an extended
+caregiving season: **Ground (1–7) → Witness (8–14) → Reclaim (15–21)** —
+a floor of resources first, the story witnessed at your pace second,
+survival rules revised for living third. Heavy nights carry consent gates
+and a lighter alternative that counts in full; every night ends grounded in
+the present; skipped nights create no catch-up debt
+(`python si.py init --lang en --track healing`). Conduct rules in
+[`references/healing.md`](references/healing.md). It is reflective
+companionship, not therapy — see
+[`references/safety.md`](references/safety.md).
+
 ### Quick start
 
 This is a [Hermes Agent](https://github.com/NousResearch/hermes-agent) skill

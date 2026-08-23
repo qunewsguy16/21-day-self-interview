@@ -61,8 +61,16 @@ python si.py recap --day N           # 取某一天
 ```
 
 State lives in `$SI_HOME` or `~/.self-interview/`:
-- `state.json` — language, start date, progress.
+- `state.json` — language, track, start date, progress.
 - `journal.json` — every night's answers, kept forever (the raw material for reflection).
+
+**Tracks.** `init --track healing` selects `questions.healing.en.json` — a
+trauma-informed variant (Ground → Understand becomes Ground → Witness →
+Reclaim) with stricter conduct rules in `references/healing.md`: consent
+gates before heavy nights, a `gentle_alt` question that counts as the full
+night, grounding closings, and no-debt pacing (`--pace nights`). On a
+healing-track run, `references/healing.md` overrides this file wherever the
+two conflict.
 
 ## Nightly Flow / 每晚的流程
 

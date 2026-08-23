@@ -5,6 +5,7 @@ state.json
 journal.json
 snapshot.txt
 si-snapshot*
+si-*-snapshot*
 answers*
 *.answers.*
 

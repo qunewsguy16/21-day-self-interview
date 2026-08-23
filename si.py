@@ -10,7 +10,7 @@ conversation, records the user's answers. Everything is plain stdlib so the
 repo runs anywhere Python 3.8+ exists.
 
 Usage:
-  python si.py init [--lang zh|en] [--start YYYY-MM-DD]
+  python si.py init [--lang zh|en] [--start YYYY-MM-DD] [--track classic|healing]
   python si.py prompt            # what to ask tonight (JSON for the agent)
   python si.py status            # human-readable progress
   python si.py record --day N --file answers.txt   # save the night's answers
@@ -35,11 +35,19 @@ def home() -> pathlib.Path:
 def repo_root() -> pathlib.Path:
     return pathlib.Path(__file__).resolve().parent
 
-def load_questions(lang: str) -> dict:
+def load_questions(lang: str, track: str = "classic") -> dict:
+    if track and track != "classic":
+        f = repo_root() / f"questions.{track}.{lang}.json"
+        if f.exists():
+            return json.loads(f.read_text(encoding="utf-8"))
     f = repo_root() / f"questions.{lang}.json"
     if not f.exists():
         f = repo_root() / "questions.zh.json"
     return json.loads(f.read_text(encoding="utf-8"))
+
+
+def questions_for(st: dict) -> dict:
+    return load_questions(st["lang"], st.get("track", "classic"))
 
 def state_path() -> pathlib.Path:
     return home() / "state.json"
@@ -68,11 +76,29 @@ def save_journal(j: dict):
 def today() -> datetime.date:
     return datetime.date.today()
 
-def current_day(st: dict) -> int:
-    """Day number 1..21 based on calendar days since start. Capped at 21."""
+def current_day(st: dict, journal: dict = None) -> int:
+    """Which night is next, per the journey's pacing rule.
+
+    calendar (classic default): day 1..21 by calendar days since start. Missing
+      a night means catching up later — the day number keeps moving.
+    nights (healing default): the next unrecorded night, in order. A skipped
+      evening creates no debt and no doubled-up catch-up nights — 21 nights,
+      not 21 calendar days. This matters when consecutive nights are heavy.
+    """
+    if st.get("pace", "calendar") == "nights":
+        recorded = {int(k) for k in (journal or {})}
+        for n in range(1, 22):
+            if n not in recorded:
+                return n
+        return 21
     start = datetime.date.fromisoformat(st["start_date"])
     delta = (today() - start).days
     return max(1, min(21, delta + 1))
+
+
+def answered_tonight(journal: dict) -> bool:
+    """True if any night was already recorded on today's date."""
+    return any(e.get("date") == today().isoformat() for e in journal.values())
 
 # ---------- commands ----------
 
@@ -87,9 +113,14 @@ def cmd_init(args):
         }, ensure_ascii=False))
         return
     start = args.start or today().isoformat()
+    # The healing track paces by nights completed, not calendar days: a skipped
+    # evening must not stack two heavy nights onto the next one.
+    pace = args.pace or ("nights" if args.track != "classic" else "calendar")
     st = {
         "version": VERSION,
         "lang": args.lang,
+        "track": args.track,
+        "pace": pace,
         "start_date": start,
         "created_at": datetime.datetime.now().isoformat(timespec="seconds"),
         "completed_days": [],
@@ -97,7 +128,7 @@ def cmd_init(args):
     save_state(st)
     if not journal_path().exists():
         save_journal({})
-    q = load_questions(args.lang)
+    q = load_questions(args.lang, args.track)
     print(json.dumps({
         "ok": True,
         "msg": f"已开始《{q['title']}》。第一晚从 {start} 起。 / Started '{q['title']}'. Day 1 begins {start}.",
@@ -122,18 +153,23 @@ def cmd_prompt(args):
     if not st:
         print(json.dumps({"ok": False, "msg": "尚未开始。先运行 init。 / Not started. Run init first."}, ensure_ascii=False))
         return
-    n = current_day(st)
-    q = load_questions(st["lang"])
+    journal = load_journal()
+    n = current_day(st, journal)
+    q = questions_for(st)
     day = _day_block(q, n)
     phase = _phase_for(q, n)
-    journal = load_journal()
-    done = str(n) in journal
+    # In nights pacing, n is the next unrecorded night, so "answered" means a
+    # night was already recorded this evening — the agent should check in
+    # warmly rather than push a second (possibly heavy) night in one sitting.
+    done = answered_tonight(journal) if st.get("pace") == "nights" else str(n) in journal
     out = {
         "ok": True,
         "day": n,
         "total": 21,
         "already_answered_today": done,
         "lang": st["lang"],
+        "track": st.get("track", "classic"),
+        "pace": st.get("pace", "calendar"),
         "title": q["title"],
         "phase": {"id": phase["id"], "name": phase["name"], "intent": phase["intent"]},
         "theme": day["theme"],
@@ -142,6 +178,12 @@ def cmd_prompt(args):
         "mirror_note_for_agent": day["mirror"],
         "recap_available": [int(k) for k in journal.keys()],
     }
+    # Optional per-night fields (healing track): a consent gate to honor before
+    # heavy ground, a lighter question that counts as the full night, and a
+    # grounding line to close on. Pass them through untouched.
+    for extra in ("consent_gate", "gentle_alt", "closing"):
+        if day.get(extra):
+            out[extra] = day[extra]
     print(json.dumps(out, ensure_ascii=False))
 
 def cmd_status(args):
@@ -149,13 +191,13 @@ def cmd_status(args):
     if not st:
         print("尚未开始任何自我访谈。运行：python si.py init / No journey yet. Run: python si.py init")
         return
-    n = current_day(st)
-    q = load_questions(st["lang"])
     journal = load_journal()
+    n = current_day(st, journal)
+    q = questions_for(st)
     phase = _phase_for(q, n)
     answered = sorted(int(k) for k in journal.keys())
     bar = "".join("●" if (i+1) in answered else ("◐" if (i+1)==n else "○") for i in range(21))
-    print(f"《{q['title']}》  v{st['version']}  [{st['lang']}]")
+    print(f"《{q['title']}》  v{st['version']}  [{st['lang']}·{st.get('track', 'classic')}]")
     print(f"开始 / Start: {st['start_date']}   今天 / Today: Day {n}/21   阶段 / Phase: {phase['name']}")
     print(f"进度 / Progress: {bar}  ({len(answered)}/21 答过 answered)")
     if answered:
@@ -165,16 +207,16 @@ def cmd_record(args):
     st = load_state()
     if not st:
         print(json.dumps({"ok": False, "msg": "尚未开始。 / Not started."}, ensure_ascii=False)); return
-    n = args.day or current_day(st)
+    journal = load_journal()
+    n = args.day or current_day(st, journal)
     if args.file:
         text = pathlib.Path(args.file).read_text(encoding="utf-8")
     else:
         text = args.text or ""
     if not text.strip():
         print(json.dumps({"ok": False, "msg": "没有内容可记录。 / Nothing to record."}, ensure_ascii=False)); return
-    q = load_questions(st["lang"])
+    q = questions_for(st)
     day = _day_block(q, n)
-    journal = load_journal()
     journal[str(n)] = {
         "day": n,
         "theme": day["theme"],
@@ -221,6 +263,11 @@ def main():
 
     p = sub.add_parser("init", help="start a new 21-day journey")
     p.add_argument("--lang", choices=["zh", "en"], default="zh")
+    p.add_argument("--track", default="classic",
+                   help="question bank: classic (default) or any questions.<track>.<lang>.json, e.g. healing")
+    p.add_argument("--pace", choices=["calendar", "nights"],
+                   help="calendar: day follows the date (classic default); "
+                        "nights: next unrecorded night, skips create no debt (healing default)")
     p.add_argument("--start", help="start date YYYY-MM-DD (default: today)")
     p.add_argument("--force", action="store_true", help="overwrite existing state")
     p.set_defaults(func=cmd_init)

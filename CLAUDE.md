@@ -23,7 +23,10 @@ private and must never enter this repo or any outward-facing surface:
   State lives in `$SI_HOME` or `~/.self-interview/`, outside the repo.
 - `si_snapshot.py` — packs local state into a private snapshot doc for the
   user's own Drive, and restores from it. See `PRIVATE-DEPLOY.md`.
-- `questions.en.json` / `questions.zh.json` — the 21-night question banks.
+- `questions.en.json` / `questions.zh.json` — the classic 21-night banks.
+  `questions.healing.en.json` — the healing track (trauma-informed variant;
+  conduct rules in `references/healing.md`). `si.py init --track healing`
+  selects it.
 - `SKILL.md` — the counselor character and conversation rules (source of
   truth for behavior). `.claude/skills/self-interview/SKILL.md` — the Claude
   Code / Cowork deployment of it (persistence + privacy mechanics).
@@ -35,5 +38,8 @@ private and must never enter this repo or any outward-facing surface:
   `TZ=America/New_York python3 si.py prompt` — day rollover must follow the
   user's midnight, not UTC.
 - Python: 3.8+, stdlib only. No new dependencies.
-- Question-bank edits must keep the See → Understand → Choose arc (21 days,
-  3 questions per day) and stay parseable by `si.py`.
+- Question-bank edits must keep each track's three-phase arc (classic:
+  See → Understand → Choose; healing: Ground → Witness → Reclaim), stay at
+  21 days × 3 questions, and remain parseable by `si.py`. Healing-track
+  edits must also respect the conduct rules in `references/healing.md`
+  (consent gates, gentle_alt, grounding closings).
