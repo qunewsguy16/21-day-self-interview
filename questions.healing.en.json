@@ -1,0 +1,338 @@
+{
+  "lang": "en",
+  "track": "healing",
+  "title": "21 Days of Self-Interview — Healing Track",
+  "subtitle": "For old family weather and long seasons of caring for someone. A floor first, then the story, then what's yours to keep.",
+  "notes_for_agent": "This track is for a user working through the long aftermath of a difficult childhood and/or an extended caregiving season. Read references/healing.md before night 1 and follow its conduct rules: capacity check at the open, one question at a time, consent gates honored, the gentle_alt counts as a full night, ground before closing, skipped nights create no debt. This is reflective companionship, not trauma therapy — never excavate, never diagnose, and follow references/safety.md if real distress surfaces.",
+  "phases": [
+    {
+      "id": 1,
+      "name": "Ground",
+      "range": [
+        1,
+        7
+      ],
+      "intent": "Before looking back, build a floor: what steadies you, who feels safe, what the body knows, what survived intact. Nothing this week requires visiting anything painful."
+    },
+    {
+      "id": 2,
+      "name": "Witness",
+      "range": [
+        8,
+        14
+      ],
+      "intent": "The story, told at your pace and in your words — the house you grew up in, and the long season of caring. The work of this week is being accurately seen, not fixed."
+    },
+    {
+      "id": 3,
+      "name": "Reclaim",
+      "range": [
+        15,
+        21
+      ],
+      "intent": "What was learned for survival gets revised for living: rules rewritten in your own hand, the advocate turned inward, what you keep from those years, and an ordinary week that fits the person you actually are."
+    }
+  ],
+  "days": [
+    {
+      "day": 1,
+      "phase": 1,
+      "theme": "Starting Point",
+      "opening": "This round is different from a stock-taking. We're turning toward some old weather — slowly, with the door open the whole time. Tonight is only about where we're starting and how you want to travel.",
+      "questions": [
+        "What made now the right time to turn toward this? In your own words — no clinical language needed — what are you hoping begins to heal?",
+        "Twenty-one nights from now, what would 'this was worth it' look like? Not healed — begun. What would you notice?",
+        "You get to set the rules of the road before we go anywhere: how will you tell me a night needs to go slower, or lighter, or stop? Pick the words now, while nothing is heavy."
+      ],
+      "gentle_alt": "In one or two sentences, what does 'healing' mean to you — what would there be more of, or less of?",
+      "closing": "That's the whole night: a direction and a set of brakes you installed yourself. Notice one thing nearby that's ordinary and fine — that's where we end, here in the present.",
+      "mirror": "Baseline night. Record the user's own definition of what needs healing and what 'begun' would look like — these words anchor nights 14, 20, and 21. Record their stop/slow-down signals VERBATIM; those signals are binding for the rest of the run. Do not summarize their history for them tonight; where the pain comes from is week two's material, at their pace. If they name professional support (a therapist, a group), note it as part of the floor; if they don't, mention once — briefly, without pressure — that this journey works well alongside a human professional, then let it go."
+    },
+    {
+      "day": 2,
+      "phase": 1,
+      "theme": "Steadiness",
+      "opening": "Healing work goes better from a steady place, so before anything else we map what steadiness you already have. Tonight is an inventory, not an assignment.",
+      "questions": [
+        "What in your life right now is solid — reliably there when other things wobble? People, places, routines, anything that holds.",
+        "When something knocks you off level, what do you actually do that helps you come back — even a little, even if it doesn't look impressive?",
+        "What reliably makes things worse when you're already down? Just naming it is enough — we're drawing a map, not writing rules."
+      ],
+      "gentle_alt": "Name one thing — a person, a place, a routine — that reliably steadies you.",
+      "closing": "Everything you named tonight already exists; nothing had to be built. We'll lean on this list later. End by picking one steady thing from it and letting it be enough for tonight.",
+      "mirror": "Build the resource map: what steadies, what destabilizes. These are the user's OWN regulation methods — never replace them with techniques. On heavy nights later in the run, this list is what you reach for at the close. Note the difference between steadiness that restores and numbing that only pauses — but only note it if the user draws that line themselves."
+    },
+    {
+      "day": 3,
+      "phase": 1,
+      "theme": "Safe Company",
+      "opening": "Old injuries from people tend to heal near people — the right ones. Tonight we look at who feels safe, and what safe even feels like for you.",
+      "questions": [
+        "With whom can you be most fully yourself — no performance, no managing the room? What do they do, or not do, that makes it possible?",
+        "Is there anyone who knew you through the hard years who still sees you clearly — who knows some of the story already?",
+        "When something heavy is moving in you, do you tend to reach toward people or away from them? No judgment — just which way the current pulls, and what it costs or protects."
+      ],
+      "gentle_alt": "Who is the easiest person in your life to be around right now — and what makes them easy?",
+      "closing": "Whatever the size of tonight's list, it's a real list. You are not doing this round entirely alone — this conversation is on the list too. That's enough for tonight.",
+      "mirror": "Map the allies: who is safe, what safety consists of in the user's words, and the reach-toward vs. pull-away pattern. Do not pathologize pulling away — in week two it may turn out to have been learned for good reason. If the map is thin, do not dramatize that; one safe person is a floor, and so is this nightly conversation."
+    },
+    {
+      "day": 4,
+      "phase": 1,
+      "theme": "The Body Tonight",
+      "opening": "Bodies keep score of long hard seasons, but they also keep the exits. Tonight we only listen to yours in the present tense — nothing historical.",
+      "questions": [
+        "Where does stress live in your body these days? Where do you notice tightness, bracing, or tiredness that doesn't sleep off?",
+        "What conditions actually release it? You may already know one or two — situations where your body drops its guard on its own.",
+        "If your body could set one rule for these 21 nights — a bedtime, a pace, a thing to stop doing to it — what would it ask for?"
+      ],
+      "gentle_alt": "Right now, tonight: is your body tense or at ease, and where do you feel that most?",
+      "closing": "Do one kind mechanical thing for your body before sleep — drop your shoulders, unclench your jaw, or just breathe out longer than you breathe in, once. That's the whole homework; there is no homework.",
+      "mirror": "Somatic baseline, present tense ONLY — do not connect body states to history tonight even if the connection seems obvious; that link belongs to the user and to week two. Record what releases the guard: those conditions are grounding tools for the heavier nights. The body's 'one rule' is theirs — honor it in how you pace later nights."
+    },
+    {
+      "day": 5,
+      "phase": 1,
+      "theme": "What Survived",
+      "opening": "Before we go anywhere near what the hard years took, we put on record what they didn't take — and what they left behind that's worth keeping. Tonight is evidence, not comfort.",
+      "questions": [
+        "People who come through long hard seasons usually carry real capabilities out of them. What can you do — or see, or withstand — that you know traces back to what you've been through?",
+        "What part of you did the hard years not manage to change? Something that was true of you as a kid and is still true now.",
+        "Is there anything you genuinely like about how you turned out? Say it plainly. This is the one night I'll push back if you deflect."
+      ],
+      "gentle_alt": "Name one strength you have that you paid for the hard way.",
+      "closing": "Everything you just said stays on the record — when later weeks get heavy, I will be quoting tonight back to you. End on the strongest sentence you said; say it once more to yourself, silently, as we stop.",
+      "mirror": "The counter-weight night: build the strengths record in the user's exact words. It gets quoted during week two whenever their self-verdict runs harsher than their evidence. Deflection, self-deprecation, or apologizing for the answer is the one pattern you gently name tonight — once, warmly, without a lecture."
+    },
+    {
+      "day": 6,
+      "phase": 1,
+      "theme": "Present Weather",
+      "opening": "Old seasons leave weather patterns in the present: situations that hit harder than their size explains. Tonight we only notice them — like a meteorologist, not a judge. We are not opening their history yet.",
+      "consent_gate": "Tonight brushes against where things come from, without going there. If even noticing feels like too much tonight, the lighter question below counts as the full night.",
+      "questions": [
+        "In an ordinary week now, what situations reliably put you on edge, out of proportion to their actual size? Certain tones, certain asks, certain rooms?",
+        "When it happens, what does it feel like from the inside — and roughly how old does that feeling seem? Older than the situation?",
+        "What do you usually do next — and does it help, cost you something, or both?"
+      ],
+      "gentle_alt": "Name one situation that reliably gets under your skin more than it should. Just the situation — nothing else needed.",
+      "closing": "Weather isn't character — a storm passing through a valley says nothing bad about the valley. Come back to the room: name one thing here that is calm. That's where we stop.",
+      "mirror": "Catalogue the present-day echoes as weather patterns, never as defects. These become week-two threads ONLY if the user carries them there — do not pre-connect a trigger to a childhood source, even when the line seems obvious. The 'how old does it feel' answer is important: keep it verbatim."
+    },
+    {
+      "day": 7,
+      "phase": 1,
+      "theme": "Week One Review — The Floor",
+      "opening": "Phase one closes tonight. Before anything else, let me hand back what you built this week — a floor, in your own words.",
+      "questions": [
+        "Reading back over this week, which of your own lines lands hardest tonight — and why that one?",
+        "What did this week show you about what you already have to stand on? Anything on the list surprise you?",
+        "Next week we look at where things came from — the house you grew up in, and the caring years — at your pace, with exits everywhere. What do you want me to remember going in? And is there anything I should not push on unless you bring it up first?"
+      ],
+      "gentle_alt": "Of everything you said this week, what's the one line worth keeping?",
+      "closing": "The floor holds: steadying things, safe people, a body that knows the exits, strengths on record, and brakes you chose yourself. Week two happens on top of that floor, not instead of it. Sleep on solid ground tonight.",
+      "mirror": "REFLECTION NIGHT — run recap first and open by weaving the week from the user's own quotes: resources, allies, body knowledge, strengths, weather. Then take question 3 seriously: the boundaries they set tonight form the consent map for all of phase two, and they are binding. Record that map verbatim. Do not preview week two's questions or speculate about what will come up."
+    },
+    {
+      "day": 8,
+      "phase": 2,
+      "theme": "The House You Grew Up In",
+      "opening": "Phase two, at your pace. We start where the oldest rules were written: the house you grew up in — not the floor plan, the atmosphere.",
+      "consent_gate": "Tonight looks back at childhood. You set the depth: a single word, one scene, or the whole weather report — each counts as a full night. If tonight isn't the night, we take the lighter path and nothing is lost.",
+      "questions": [
+        "If you described the air in the house you grew up in — what was allowed, what wasn't, what could change the temperature of a room — what would you say?",
+        "What did a kid have to do to be okay in that house? What worked, what didn't?",
+        "Is there one small, specific memory that captures how the house worked? Tell it at whatever length you want."
+      ],
+      "gentle_alt": "What one word describes the feeling of being a kid in your house? You can leave it at the word.",
+      "closing": "You just did something the kid in that house couldn't do: describe it out loud, to someone, in safety. Look around the room you're actually in — it's yours, and the old rules don't govern it. That's where we end tonight.",
+      "mirror": "Record the atmosphere and the child's rules-of-survival in the user's exact words — no labels, no diagnoses, no 'that sounds like ___'. Ask at most one or two gentle follow-ups and let silence do the rest. Whatever depth they chose tonight, treat it as exactly right. Close with grounding, always — never end this night inside the memory."
+    },
+    {
+      "day": 9,
+      "phase": 2,
+      "theme": "The Kid",
+      "opening": "Behind every set of house rules there was a kid learning them. Tonight is about that kid — looked at with your adult eyes, from a safe distance.",
+      "consent_gate": "Tonight can stir more than expected. Same deal as always: you set the depth, the lighter question counts in full, and we can stop anywhere.",
+      "questions": [
+        "Picture yourself as a kid — whatever age shows up first. What was that kid actually like, before anything required him to be otherwise?",
+        "What did that kid need that the adults around couldn't, or didn't, give?",
+        "If you could stand in the doorway of one remembered moment and say a single sentence to that kid, what would it be?"
+      ],
+      "gentle_alt": "What's one true, kind sentence about the kid you were?",
+      "closing": "That kid's qualities didn't vanish — some of them showed up on night 5, on your own strengths list. He made it out, and he's the one who chose to do this round. Come back to the room; we end in the present.",
+      "mirror": "Keep the doorway sentence VERBATIM — it may be the most important line of the run and returns on nights 16 and 21. Note the named unmet needs in the user's words. If grief or anger arrives, hold it without hurrying it toward anything; acknowledgment, then space. Do not assign any inner-child exercise or practice — the night is witnessing, not homework."
+    },
+    {
+      "day": 10,
+      "phase": 2,
+      "theme": "The Adaptations",
+      "opening": "Kids in hard houses become brilliant engineers — they build whatever keeps them safe. Tonight we look at what you built, and we give the engineering its due before we ask what it costs now.",
+      "questions": [
+        "What did you learn to do to stay safe or keep the peace back then — pleasing, vanishing, performing, reading the room before anyone spoke?",
+        "Take each one you named: how did it protect you at the time? Give the kid credit for what actually worked.",
+        "Which of them still runs today, on its own, in situations that are no longer dangerous? What does it cost you now?"
+      ],
+      "gentle_alt": "Name one thing you do around people that you first learned to do to stay safe as a kid.",
+      "closing": "Nothing you named tonight is a flaw — every one of them is a survival design that worked, still running past the end of the emergency it was built for. Designs can be revised; that's week three's business, not tonight's. Tonight, just respect the engineer.",
+      "mirror": "The reframe night: every 'defect' the user names gets restated as a strategy that succeeded — in their words, with their examples. The present-day cost matters, but the USER draws that line; never lead with it. Connect to night 6's weather patterns only if the user connects them first. No revision plans tonight — naming and honoring is the whole night."
+    },
+    {
+      "day": 11,
+      "phase": 2,
+      "theme": "The Long Season of Caring",
+      "opening": "Some lives contain a long stretch where someone else's needs set the shape of every day. If yours does, tonight is that season's night — told however you want to tell it.",
+      "consent_gate": "This may be the heaviest ground of the round. One image counts as a full night. Facts tonight, feelings whenever they're ready — there is no schedule for this.",
+      "questions": [
+        "Tell me about the season when someone depended on you. However you want — the timeline, a few scenes, or just what an ordinary day in it was like.",
+        "What did those years ask of you? What did you have to set down — plans, habits, pieces of your own life — to carry it?",
+        "What did you do well in that season? Not what you wish you'd done — what you actually did, that someone needed done."
+      ],
+      "gentle_alt": "What's one image from that season that has stayed with you? No need to explain it.",
+      "closing": "However much or little you said tonight, the season is on the record now, in your words, witnessed. Set it down for the night — carrying it was the old job, not tonight's. Name one thing in your evening that's yours alone, and end there.",
+      "mirror": "Witness the facts before any feelings — the user may need the ledger stated before what it cost can be felt (asking for feelings too early gets an inventory anyway, so honor the inventory as the real first answer it is). Q3 matters most: get what they did WELL on the record in their own words; it is load-bearing for nights 12, 18, and 21. Do not calculate what the season cost them tonight — that is night 12, and only at their pace."
+    },
+    {
+      "day": 12,
+      "phase": 2,
+      "theme": "What It Cost",
+      "opening": "Last night put the season on the record. Tonight is the other column of the ledger — what carrying it cost, and the feelings about that which are hardest to admit to.",
+      "consent_gate": "Costs and complicated feelings tonight — including the kind that feel wrong to have. Everything said here stays ordinary and human. Lighter path available as always, and it counts.",
+      "questions": [
+        "When the season ended, what state were you actually in — body, heart, money, the rest of your life?",
+        "Which feelings from that time have been hardest to allow — the ones that seem unfair or ungrateful to have? They count double tonight precisely because they're hard to say.",
+        "If a friend had lived those exact years and then felt those exact feelings, what would you say to them — honestly, not politely?"
+      ],
+      "gentle_alt": "Complete one sentence, and that's the night: 'Carrying that season cost me ___.'",
+      "closing": "Feelings about a cost are not a verdict on the caring — both columns of a ledger can be true at once, and tonight you let both exist out loud. That's rare and it's enough. Come back to the room, find one comfortable thing in it, and stop there.",
+      "mirror": "The knot night: resentment, bitterness, relief, and guilt-about-all-three may surface together. Normalize ambivalence WITHOUT prescribing it — reflect exactly what the user names and add nothing. Q3 is the pivot: their answer to the friend is their own compassion, in their own voice — keep it verbatim and do not point out the discrepancy tonight; night 16 owns that. If their self-verdict runs harsher than their evidence, quote their evidence back (night 5, night 11 Q3) and let the verdict stay theirs."
+    },
+    {
+      "day": 13,
+      "phase": 2,
+      "theme": "Grief, In Its Own Shape",
+      "opening": "Grief rarely looks like it does in the movies — especially grief that had to wait its turn while there was work to do. Tonight it gets room, in whatever shape it actually takes.",
+      "consent_gate": "Tonight is for grief, if any is there. There's no correct shape and no required tears. A single remembered detail counts as the whole night.",
+      "questions": [
+        "What shape has your grief taken? Did it ever get room to move, or did it have to wait — and is some of it still waiting?",
+        "What do you miss? And what do you not miss? Both are allowed on the same page, and both count.",
+        "Is there anything still unsaid — to the person, to yourself, to anyone from those years — that wants saying, even if only here, tonight?"
+      ],
+      "gentle_alt": "What's one thing about them you want remembered?",
+      "closing": "Whatever grief said tonight, it was heard, and nothing more is owed on it. Grief keeps its own calendar; we don't set appointments for it. Something warm before sleep — a drink, a blanket, a familiar show — is a fine way to end this one.",
+      "mirror": "Hold, don't tidy. No silver linings, no 'at least', no reframing grief as growth. Anything unsaid gets recorded verbatim, and note whether saying it HERE seemed to complete something or point toward something — but leave any further step entirely unraised. 'What do you not miss' can unlock as much as 'what do you miss'; treat both answers with equal respect."
+    },
+    {
+      "day": 14,
+      "phase": 2,
+      "theme": "Week Two Review — The Story, Witnessed",
+      "opening": "Phase two closes tonight. You told the story — the house, the kid, the armor, the season, the cost, the grief. Before the questions, let me hand it back to you whole, in your own words.",
+      "questions": [
+        "Hearing your own account read back, what do you understand about yourself now that was blurry two weeks ago?",
+        "Where in this story has your verdict on yourself been running harsher than your own evidence? Take your time — you now have the evidence in front of you.",
+        "Phase three is about what happens next — rules rewritten in your handwriting, what you keep from those years, and a life that fits. What from these two weeks most deserves to come forward with you?"
+      ],
+      "gentle_alt": "In one sentence: what does the story you told this week deserve to have said about it?",
+      "closing": "The story is witnessed now — told by you, heard in full, kept safe. It doesn't need retelling to stay true, and week three doesn't reopen it; week three builds on it. The heaviest part of this round is behind you. Rest tonight.",
+      "mirror": "REFLECTION NIGHT — recap first, then weave the childhood rules, the adaptations, the caregiving season, the cost, and the grief into ONE coherent witnessed account built ONLY from the user's quotes. This is the emotional center of the run: accurate, dignified, unflinching, warm. Q2 is the evidence-vs-verdict check — quote specific instances (night 5's strengths, night 11's Q3, night 12's friend-answer) where their record outruns their self-judgment, and let THEM re-render the verdict. Explicitly mark the turn: the looking-back is done; from here the round faces forward."
+    },
+    {
+      "day": 15,
+      "phase": 3,
+      "theme": "The Rules, Rewritten",
+      "opening": "Welcome to phase three. The old house had rules and you know them by heart. Tonight you find out which ones you've already quietly outgrown — and take a pen to the one that's still writing your days.",
+      "questions": [
+        "Of the rules you were raised under, which have already expired — which do you now break without ceremony, maybe without noticing you started?",
+        "Which one still runs you hardest today? Say the rule the way it was actually installed — the wording matters.",
+        "If you rewrote that rule as one a grown man would choose for his one life — keeping anything about it that ever served you — what would it now say, in your own words?"
+      ],
+      "gentle_alt": "Name one old rule from growing up that you no longer obey.",
+      "closing": "No practice schedule, no assignment — a rewritten rule isn't a resolution, it's a fact about who wrote it. It exists now, in your handwriting. That's the whole night.",
+      "mirror": "The rewritten rule must be in the user's exact words — offer no drafts. CRITICAL: do not convert the new rule into a commitment, a practice, or a should; the moment it becomes an obligation it joins the old rules. If the user spontaneously names a place it could be tried, record that; never assign one. Connect to night 10's adaptations only through the user's own phrasing."
+    },
+    {
+      "day": 16,
+      "phase": 3,
+      "theme": "The Advocate, Turned Inward",
+      "opening": "Somewhere along the way you learned to fight properly for people who couldn't fight for themselves. Tonight we look at the difference between how that advocate talks — and how you talk to yourself.",
+      "questions": [
+        "When you drop a ball, what's the exact first sentence you say to yourself? The real wording. And whose voice does it sound like, if not yours?",
+        "You've been an effective advocate when someone needed one. If that same advocate reviewed your latest hard week — with the full case file from these 15 nights — what would he say on your behalf?",
+        "Put the two side by side: the inner sentence and the advocate's. Which one holds up better against the evidence? Which one do you actually believe?"
+      ],
+      "gentle_alt": "Would you ever say to someone you were fighting for what you routinely say to yourself? One-word answer accepted.",
+      "closing": "The advocate isn't a technique someone's teaching you — he's already yours, already trained, already undefeated on someone else's behalf. Tonight he took his first case in-house. We end there.",
+      "mirror": "This night runs on the user's OWN established capacity — never present it as a self-compassion exercise or name any technique. The doorway sentence from night 9 and the friend-answer from night 12 are the advocate's existing case files: quote them if the user goes blank. The inner critic's 'whose voice' answer connects to week two only if the user makes the connection. Let the verdict between the two voices be entirely theirs."
+    },
+    {
+      "day": 17,
+      "phase": 3,
+      "theme": "Taking Up Space",
+      "opening": "One of the oldest jobs a kid can be given is being easy to have around. Tonight we look at where that job is still running — and what the evidence says about resigning from it.",
+      "questions": [
+        "Where in your life now do you still make yourself easy — smaller, quieter, more convenient — at your own expense? Pick the arena that costs you most.",
+        "In that arena, what do you predict would happen if you took up your full space — asked, declined, disagreed, corrected? Say the feared outcome out loud.",
+        "Now check the prediction against your actual record: has there been a time you asked for something, said no, or held your ground — and it went fine, or even well? What actually happened?"
+      ],
+      "gentle_alt": "Name one place where you're more convenient than you want to be.",
+      "closing": "Nothing to go do — tonight was a records check, and the records are yours now either way. Being easy was a skill that kept a kid safe; whether it still earns its keep is a question you now get to answer with evidence instead of reflex. That's where we stop.",
+      "mirror": "Evidence-test the feared outcome using ONLY the user's own counter-examples — reassurance from you is worthless here and shouldn't be offered. If their record contains no counter-example, that's a finding too, not a failure; record it without alarm. Do not assign a boundary to go set. If they name one they want to try, keep it in their words and do not attach a timeline."
+    },
+    {
+      "day": 18,
+      "phase": 3,
+      "theme": "What You Keep",
+      "opening": "Not everything from a hard inheritance is debris — there are also tools, loyalties, loves, and jokes in the crates. Tonight we sort: what you keep on purpose, and what you're done carrying.",
+      "questions": [
+        "From your family, and from the caring years: what do you consciously choose to keep? Skills, recipes, loyalties, humor, a way of showing up — anything you'd take even if you had the choice again.",
+        "What have you been carrying that was never actually yours — someone else's fear, someone else's rulebook, someone else's unfinished business? What would setting it down even look like?",
+        "Is there something from the people who are gone that you'd want to live on through how you live — not as an obligation, as an inheritance you claim?"
+      ],
+      "gentle_alt": "Name one thing from those years you'd keep, and one you're done carrying.",
+      "closing": "Keeping is a choice now, not a default — that's the difference between inheriting and being buried in the estate. What you claimed tonight is yours by decision. Travel light; sleep well.",
+      "mirror": "The sorting night: the keep-list matters exactly as much as the put-down list — do not let the night become only about release. Claimed inheritances (Q3) connect back to night 11's 'what you did well' and forward to night 21. 'Setting it down' stays a description, never a ritual or an assignment. If the user distinguishes honoring someone from obeying them, keep that distinction in their exact words."
+    },
+    {
+      "day": 19,
+      "phase": 3,
+      "theme": "Being Cared For",
+      "opening": "You know to the bone how to be the one who shows up. Tonight is the other direction — what happens in you when care points your way, and how much of it you can actually let land.",
+      "questions": [
+        "When someone tries to look after you — worries about you, does you a favor, asks how you really are — what happens inside? What's the reflex?",
+        "What's the smallest act of being cared for that you can genuinely let land without deflecting — and when did that last happen?",
+        "Who in your life right now would show up if you asked? And what usually stands between you and the asking?"
+      ],
+      "gentle_alt": "What's one small way of being looked after that you don't hate?",
+      "closing": "Letting care land is a capacity, not a debt — nothing tonight created an obligation to go practice it. You showed up for this round twenty-odd nights running; some of that was you being cared for, and it landed fine. That's the note we end on.",
+      "mirror": "The receiving night — likely the least-practiced direction for a long-time caregiver. Do not moralize about deserving care and do not assign asking-for-help as homework. The Q3 list echoes night 3's allies map: note movement between the two, if any, without announcing it as progress. If deflection shows up live in the conversation — a joke, a subject change — name it once, playfully and gently, and let it be."
+    },
+    {
+      "day": 20,
+      "phase": 3,
+      "theme": "The Life That Fits",
+      "opening": "Not the transformed life — the fitting one. Tonight we take everything these nineteen nights established about how you actually work, and describe an ordinary week that fits that man.",
+      "questions": [
+        "Knowing everything this round has shown — what steadies you, what the old rules cost, what you keep — what does a good ordinary week look like for you? Not a peak week. A Tuesday-through-Sunday that fits.",
+        "How much of that week already exists? What's one item — one, small, concrete — that the fitting week contains and the current one doesn't?",
+        "On night 1 you said what you hoped would begin to heal. What would 'begun' look like by the season after this one — described so plainly that you'd recognize it on sight?"
+      ],
+      "gentle_alt": "Name one ordinary thing that belongs in your week that isn't in it right now.",
+      "closing": "A week that fits isn't earned by finishing the healing — it's how the healing travels. You described it; it exists as a destination now. No plan required tonight, or ever, actually. One more night together after this one.",
+      "mirror": "Keep the scale ORDINARY — if the user drifts into transformation-sized answers, gently ask what the Tuesday version looks like. The 'one item' is their own working unit: record it and attach nothing to it — no reminder, no plan, no follow-up commitment. Their night-1 'begun' definition returns tonight: quote it exactly and let them measure the distance themselves."
+    },
+    {
+      "day": 21,
+      "phase": 3,
+      "theme": "The Portrait, Retaken",
+      "opening": "Last night of the round. Twenty nights ago this was weather and rubble; tonight there's a floor, a witnessed story, and a man holding a pen over his own rules. Before my questions, let me show you the whole picture — every word of it yours.",
+      "questions": [
+        "On night 1 you said what you hoped would begin to heal. Hearing that answer read back now — what's your answer tonight? What actually began?",
+        "What do you know now — about the kid, about the one who carried the caring years, about the man in this room — that you couldn't have said out loud 21 nights ago?",
+        "These conversations end tonight; the seeing doesn't have to. Of everything you said this round, what's the one sentence you want to keep within reach — and where will you keep it?"
+      ],
+      "gentle_alt": "In one sentence: what's different now, even slightly, from night 1?",
+      "closing": "The round is complete. The story is witnessed and stays witnessed; the floor you built is permanent; the rules are in your handwriting now. Healing keeps its own pace from here, and it doesn't need me in the room to continue — it needs you, and you've shown up 21 times. Goodnight — and thank you for letting me see it.",
+      "mirror": "THE FINALE — recap the ENTIRE journal first. Build the portrait in three movements — the floor (week one), the story witnessed (week two), the reclaiming (week three) — using only the user's own quotes: the night-1 hope, the night-5 strengths, the night-8 house, the night-9 doorway sentence, the night-11 season, the night-12 friend-answer, the night-16 advocate, the night-18 keep-list. Name the distance traveled without inflating it; unfinished is not failed. If professional support was named during the run, reflect it as part of the floor going forward; if not, one warm sentence that a human companion on this road — friend or professional — is strength, not failure. End by returning them to themselves, whole and dignified. Do not assign anything."
+    }
+  ]
+}
