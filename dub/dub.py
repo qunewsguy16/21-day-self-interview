@@ -1,30 +1,44 @@
 #!/usr/bin/env python3
 """Dub a foreign-language audio track into English and mux it back into the
-original file alongside the original tracks.
+original file alongside the original tracks. Fully local — no cloud services.
 
-Pipeline (all local, no cloud services):
+Two modes:
+
+  default        Fast "lector-style" dub: one stock narrator voice (Kokoro)
+                 spoken over the original track, which is ducked underneath
+                 so music and effects survive.
+
+  --clone        Voice-preserving dub: Demucs splits vocals from the
+                 music/effects bed, XTTS-v2 clones each segment's original
+                 speaker audio to speak the English line, and the dub is
+                 mixed over the untouched background stem. Slower, needs a
+                 GPU to be pleasant, keeps the original voices and much of
+                 their tone.
+
+Shared pipeline:
   1. ffprobe finds the foreign audio track (first track not tagged eng/en).
-  2. ffmpeg extracts it to wav.
-  3. faster-whisper transcribes AND translates to English in one pass
+  2. faster-whisper transcribes AND translates to English in one pass
      (task="translate"), producing timestamped English segments.
-  4. Kokoro TTS speaks each segment; each clip is placed at its original
-     timestamp. Clips that run longer than their slot are sped up (atempo,
-     capped at 1.5x) so the dub stays in sync.
-  5. The original track is ducked under the English speech (sidechain
-     compression) so music and effects survive, then the mix is muxed into
-     a copy of the original file as a new "eng" track. Original tracks are
-     copied untouched.
+  3. TTS clips are placed at their original timestamps; clips longer than
+     their slot are sped up (pitch-preserving atempo, capped at 1.5x).
+  4. ffmpeg muxes the mix into a copy of the original file as a new "eng"
+     track. All original tracks are stream-copied untouched.
+
+Models are loaded strictly one at a time (Demucs runs as a subprocess and
+exits; Whisper is freed before TTS loads), so the whole thing fits in 8GB
+of VRAM with headroom.
 
 Usage:
-  python dub.py movie.mkv                 # -> movie.eng-dub.mkv
-  python dub.py movie.mkv --plain         # dub voice only, no music bed
-  python dub.py /path/to/folder           # batch: every video missing an eng track
-  python dub.py movie.mkv --track 2       # dub a specific audio stream index
-  python dub.py movie.mkv --model medium --voice af_heart
+  python dub.py movie.mkv                    # -> movie.eng-dub.mkv (narrator)
+  python dub.py movie.mkv --clone            # voice-cloned dub
+  python dub.py movie.mkv --clone --lang ja  # skip language autodetect
+  python dub.py /path/to/folder              # batch: every file with no eng track
 """
 
 import argparse
+import gc
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -33,12 +47,24 @@ from pathlib import Path
 
 VIDEO_EXTS = {".mkv", ".mp4", ".m4v", ".mov", ".avi", ".webm", ".ts"}
 ENGLISH_TAGS = {"eng", "en"}
-TTS_SR = 24000  # Kokoro output sample rate
+TTS_SR = 24000  # Kokoro and XTTS-v2 both output 24 kHz
 MAX_SPEEDUP = 1.5  # never chipmunk a segment more than this to fit its slot
+REF_MIN_S = 3.0    # XTTS wants at least a few seconds of reference audio
+REF_MAX_S = 12.0
 
 
 def run(cmd, **kw):
     return subprocess.run(cmd, check=True, capture_output=True, **kw)
+
+
+def free_cuda():
+    gc.collect()
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except ImportError:
+        pass
 
 
 def ffprobe_streams(path):
@@ -81,28 +107,106 @@ def extract_audio(src, stream_index, dst, mono16k=False):
     run(cmd)
 
 
-def translate_to_english(wav_path, model_size):
+def demucs_separate(wav_path, tmpdir):
+    """Split audio into vocals + everything-else with Demucs (GPU if there).
+
+    Runs as a subprocess so its VRAM is fully released when it exits.
+    Returns (vocals_wav, background_wav).
+    """
+    print("  separating vocals from music/effects (Demucs) ...")
+    run([sys.executable, "-m", "demucs", "--two-stems", "vocals",
+         "-n", "htdemucs", "-o", str(tmpdir), str(wav_path)])
+    stem_dir = Path(tmpdir) / "htdemucs" / Path(wav_path).stem
+    vocals, background = stem_dir / "vocals.wav", stem_dir / "no_vocals.wav"
+    if not vocals.exists() or not background.exists():
+        raise RuntimeError(f"demucs did not produce stems in {stem_dir}")
+    return vocals, background
+
+
+def translate_to_english(wav_path, model_size, lang=None):
     from faster_whisper import WhisperModel
     print(f"  loading whisper '{model_size}' ...")
     model = WhisperModel(model_size, device="auto", compute_type="auto")
     print("  transcribing + translating to English ...")
     segments, info = model.transcribe(
-        str(wav_path), task="translate", vad_filter=True)
+        str(wav_path), task="translate", language=lang, vad_filter=True)
     segs = [(s.start, s.end, s.text.strip()) for s in segments if s.text.strip()]
     print(f"  detected language: {info.language} "
           f"({info.language_probability:.0%}), {len(segs)} segments")
+    del model
+    free_cuda()  # make room for the TTS model
     return segs
 
 
-def tts_segment(pipeline, text, voice):
-    import numpy as np
-    chunks = []
-    for _, _, audio in pipeline(text, voice=voice):
-        a = audio.numpy() if hasattr(audio, "numpy") else audio
-        chunks.append(a)
-    if not chunks:
-        return np.zeros(0, dtype="float32")
-    return np.concatenate(chunks).astype("float32")
+class KokoroSynth:
+    """Stock-voice narrator TTS (fast, CPU-friendly)."""
+
+    def __init__(self, voice):
+        from kokoro import KPipeline
+        print(f"  loading Kokoro TTS (voice {voice}) ...")
+        self.pipeline = KPipeline(lang_code="a")  # American English
+        self.voice = voice
+
+    def __call__(self, text, i, start, end):
+        import numpy as np
+        chunks = []
+        for _, _, audio in self.pipeline(text, voice=self.voice):
+            a = audio.numpy() if hasattr(audio, "numpy") else audio
+            chunks.append(a)
+        if not chunks:
+            return np.zeros(0, dtype="float32")
+        return np.concatenate(chunks).astype("float32")
+
+
+class CloneSynth:
+    """Zero-shot voice cloning via XTTS-v2: each segment's own original
+    audio is the voice reference for its English line, so whoever is
+    speaking at that moment is (approximately) the voice that speaks the
+    translation — no diarization needed."""
+
+    def __init__(self, vocals_wav, tmpdir):
+        import numpy as np
+        import soundfile as sf
+        os.environ.setdefault("COQUI_TOS_AGREED", "1")
+        from TTS.api import TTS
+        try:
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        except ImportError:
+            device = "cpu"
+        print(f"  loading XTTS-v2 voice-cloning TTS on {device} ...")
+        self.tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
+        self.tmpdir = Path(tmpdir)
+        audio, self.sr = sf.read(vocals_wav, dtype="float32")
+        self.vocals = audio.mean(axis=1) if audio.ndim > 1 else audio
+        self.np, self.sf = np, sf
+
+    def _reference(self, i, start, end):
+        """Write a REF_MIN_S..REF_MAX_S window of original vocals around
+        the segment to use as the cloning reference."""
+        dur = end - start
+        if dur < REF_MIN_S:  # widen symmetrically to the minimum
+            pad = (REF_MIN_S - dur) / 2
+            start, end = start - pad, end + pad
+        end = min(end, start + REF_MAX_S)
+        total = self.vocals.size / self.sr
+        # shift (not truncate) the window when it runs past either edge
+        if start < 0:
+            end, start = min(end - start, total), 0
+        if end > total:
+            start, end = max(start - (end - total), 0), total
+        a, b = int(start * self.sr), int(end * self.sr)
+        ref = self.tmpdir / f"ref-{i}.wav"
+        self.sf.write(ref, self.vocals[a:b], self.sr)
+        return ref
+
+    def __call__(self, text, i, start, end):
+        ref = self._reference(i, start, end)
+        try:
+            wav = self.tts.tts(text=text, speaker_wav=str(ref), language="en")
+        finally:
+            ref.unlink(missing_ok=True)
+        return self.np.asarray(wav, dtype="float32")
 
 
 def time_stretch(samples, speed, tmpdir, tag):
@@ -119,18 +223,18 @@ def time_stretch(samples, speed, tmpdir, tag):
     return out
 
 
-def build_dub_track(segments, total_duration, voice, tmpdir, out_wav):
+def build_dub_track(segments, total_duration, synth, tmpdir, out_wav):
     """Speak every segment and place it on the original timeline."""
     import numpy as np
     import soundfile as sf
-    from kokoro import KPipeline
-
-    print(f"  loading Kokoro TTS (voice {voice}) ...")
-    pipeline = KPipeline(lang_code="a")  # American English
 
     buf = np.zeros(int((total_duration + 2) * TTS_SR), dtype="float32")
     for i, (start, end, text) in enumerate(segments):
-        clip = tts_segment(pipeline, text, voice)
+        try:
+            clip = synth(text, i, start, end)
+        except Exception as e:
+            print(f"  warning: TTS failed on segment {i} ({e}); skipping")
+            continue
         if clip.size == 0:
             continue
         next_start = segments[i + 1][0] if i + 1 < len(segments) else total_duration
@@ -151,7 +255,8 @@ def build_dub_track(segments, total_duration, voice, tmpdir, out_wav):
 
 
 def mix_with_bed(orig_wav, dub_wav, out_wav):
-    """Duck the original track under the English speech, keep music/effects."""
+    """Duck the original track under the English speech, keep music/effects.
+    Used in narrator mode, where the original vocals are still in the bed."""
     fc = (
         "[1:a]asplit=2[sc][voice];"
         "[0:a][sc]sidechaincompress="
@@ -159,6 +264,14 @@ def mix_with_bed(orig_wav, dub_wav, out_wav):
         "[duck][voice]amix=inputs=2:duration=longest:normalize=0[out]"
     )
     run(["ffmpeg", "-y", "-v", "error", "-i", str(orig_wav), "-i", str(dub_wav),
+         "-filter_complex", fc, "-map", "[out]", str(out_wav)])
+
+
+def mix_over_background(bg_wav, dub_wav, out_wav):
+    """Lay the cloned English vocals over the clean instrumental/SFX stem.
+    No ducking needed — Demucs already removed the original vocals."""
+    fc = "[0:a][1:a]amix=inputs=2:duration=longest:normalize=0[out]"
+    run(["ffmpeg", "-y", "-v", "error", "-i", str(bg_wav), "-i", str(dub_wav),
          "-filter_complex", fc, "-map", "[out]", str(out_wav)])
 
 
@@ -194,31 +307,46 @@ def dub_file(src, args):
     dst = Path(args.output) if args.output else src.with_name(
         f"{src.stem}.eng-dub{src.suffix}")
     duration = float(info["format"]["duration"])
+    mode = "clone" if args.clone else "narrator"
     print(f"{src.name}: dubbing stream {track['index']} "
-          f"({stream_lang(track)}) -> {dst.name}")
+          f"({stream_lang(track)}) -> {dst.name} [{mode}]")
 
     with tempfile.TemporaryDirectory(prefix="dub-") as tmp:
         tmp = Path(tmp)
-        asr_wav = tmp / "asr.wav"
         full_wav = tmp / "orig.wav"
         dub_wav = tmp / "dub.wav"
         mix_wav = tmp / "mix.wav"
 
-        extract_audio(src, track["index"], asr_wav, mono16k=True)
-        segments = translate_to_english(asr_wav, args.model)
-        if not segments:
-            print(f"skip {src.name}: no speech found")
-            return
-
-        build_dub_track(segments, duration, args.voice, tmp, dub_wav)
-
-        if args.plain:
-            final_wav = dub_wav
-        else:
-            print("  mixing dub over ducked original ...")
+        if args.clone:
             extract_audio(src, track["index"], full_wav)
-            mix_with_bed(full_wav, dub_wav, mix_wav)
+            vocals, background = demucs_separate(full_wav, tmp)
+            segments = translate_to_english(vocals, args.model, args.lang)
+            if not segments:
+                print(f"skip {src.name}: no speech found")
+                return
+            synth = CloneSynth(vocals, tmp)
+            build_dub_track(segments, duration, synth, tmp, dub_wav)
+            del synth
+            free_cuda()
+            print("  mixing cloned vocals over the background stem ...")
+            mix_over_background(background, dub_wav, mix_wav)
             final_wav = mix_wav
+        else:
+            asr_wav = tmp / "asr.wav"
+            extract_audio(src, track["index"], asr_wav, mono16k=True)
+            segments = translate_to_english(asr_wav, args.model, args.lang)
+            if not segments:
+                print(f"skip {src.name}: no speech found")
+                return
+            synth = KokoroSynth(args.voice)
+            build_dub_track(segments, duration, synth, tmp, dub_wav)
+            if args.plain:
+                final_wav = dub_wav
+            else:
+                print("  mixing dub over ducked original ...")
+                extract_audio(src, track["index"], full_wav)
+                mix_with_bed(full_wav, dub_wav, mix_wav)
+                final_wav = mix_wav
 
         print("  muxing into container ...")
         mux(src, final_wav, dst, len(streams))
@@ -230,16 +358,21 @@ def main():
         description="Dub foreign audio tracks into English, locally.")
     ap.add_argument("inputs", nargs="+",
                     help="video file(s) or a directory to scan")
+    ap.add_argument("--clone", action="store_true",
+                    help="voice-preserving mode: Demucs stem separation + "
+                         "XTTS-v2 zero-shot cloning of the original speakers")
     ap.add_argument("--model", default="small",
                     help="faster-whisper model size (tiny/base/small/medium/"
                          "large-v3, default: small)")
+    ap.add_argument("--lang",
+                    help="source language hint, e.g. 'ja' (default: autodetect)")
     ap.add_argument("--voice", default="af_heart",
-                    help="Kokoro voice (default: af_heart)")
+                    help="Kokoro voice for narrator mode (default: af_heart)")
     ap.add_argument("--track", type=int,
                     help="ffmpeg stream index of the audio track to dub "
                          "(default: first non-English track)")
     ap.add_argument("--plain", action="store_true",
-                    help="dub voice only; skip mixing over the ducked original")
+                    help="narrator mode only: dub voice by itself, no music bed")
     ap.add_argument("--force", action="store_true",
                     help="dub even if the file already has an English track")
     ap.add_argument("-o", "--output",
