@@ -3,3 +3,5 @@
 #   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
 demucs>=4.0
 coqui-tts>=0.24
+speechbrain>=1.0
+scikit-learn>=1.3

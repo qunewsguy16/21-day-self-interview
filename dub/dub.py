@@ -2,36 +2,35 @@
 """Dub a foreign-language audio track into English and mux it back into the
 original file alongside the original tracks. Fully local — no cloud services.
 
-Two modes:
+Default mode is a voice-preserving dub that handles every speaker separately:
 
-  default        Fast "lector-style" dub: one stock narrator voice (Kokoro)
-                 spoken over the original track, which is ducked underneath
-                 so music and effects survive.
-
-  --clone        Voice-preserving dub: Demucs splits vocals from the
-                 music/effects bed, XTTS-v2 clones each segment's original
-                 speaker audio to speak the English line, and the dub is
-                 mixed over the untouched background stem. Slower, needs a
-                 GPU to be pleasant, keeps the original voices and much of
-                 their tone.
-
-Shared pipeline:
-  1. ffprobe finds the foreign audio track (first track not tagged eng/en).
+  1. Demucs splits the track into vocals and a music/effects bed.
   2. faster-whisper transcribes AND translates to English in one pass
      (task="translate"), producing timestamped English segments.
-  3. TTS clips are placed at their original timestamps; clips longer than
-     their slot are sped up (pitch-preserving atempo, capped at 1.5x).
-  4. ffmpeg muxes the mix into a copy of the original file as a new "eng"
-     track. All original tracks are stream-copied untouched.
+  3. Speaker separation: an ECAPA speaker embedding is computed for each
+     segment of the vocal stem and the segments are clustered, so every
+     distinct speaker gets an identity — no cloud diarization, no gated
+     models.
+  4. XTTS-v2 builds one voice profile per speaker from that speaker's
+     longest, cleanest lines, then speaks all of their English lines with
+     it — each character keeps their own consistent cloned voice.
+  5. Clips are placed at their original timestamps (clips longer than
+     their slot are sped up, pitch-preserving, capped at 1.5x), mixed over
+     the untouched background stem, and muxed into a copy of the original
+     file as a new "eng" track. All original tracks are copied untouched.
+
+--narrator instead does a fast lector-style dub: one stock voice (Kokoro)
+over the original track ducked underneath. CPU-friendly.
 
 Models are loaded strictly one at a time (Demucs runs as a subprocess and
-exits; Whisper is freed before TTS loads), so the whole thing fits in 8GB
-of VRAM with headroom.
+exits; Whisper and the speaker encoder are freed before XTTS loads), so the
+whole thing fits in 8GB of VRAM with headroom.
 
 Usage:
-  python dub.py movie.mkv                    # -> movie.eng-dub.mkv (narrator)
-  python dub.py movie.mkv --clone            # voice-cloned dub
-  python dub.py movie.mkv --clone --lang ja  # skip language autodetect
+  python dub.py movie.mkv                    # voice-cloned, per-speaker dub
+  python dub.py movie.mkv --lang ja --model medium
+  python dub.py movie.mkv --speakers 4       # pin the speaker count
+  python dub.py movie.mkv --narrator         # fast stock-voice dub
   python dub.py /path/to/folder              # batch: every file with no eng track
 """
 
@@ -48,9 +47,12 @@ from pathlib import Path
 VIDEO_EXTS = {".mkv", ".mp4", ".m4v", ".mov", ".avi", ".webm", ".ts"}
 ENGLISH_TAGS = {"eng", "en"}
 TTS_SR = 24000  # Kokoro and XTTS-v2 both output 24 kHz
-MAX_SPEEDUP = 1.5  # never chipmunk a segment more than this to fit its slot
-REF_MIN_S = 3.0    # XTTS wants at least a few seconds of reference audio
-REF_MAX_S = 12.0
+MAX_SPEEDUP = 1.5    # never chipmunk a segment more than this to fit its slot
+EMBED_MIN_S = 0.7    # segments shorter than this borrow a neighbor's speaker
+REF_CLIP_MIN_S = 1.0     # per-clip minimum for voice-profile reference audio
+REF_CLIP_MAX_S = 12.0
+REF_TOTAL_S = 25.0       # how much reference audio to pool per speaker
+CLUSTER_THRESHOLD = 0.6  # cosine distance cut for "same speaker" (auto mode)
 
 
 def run(cmd, **kw):
@@ -107,6 +109,11 @@ def extract_audio(src, stream_index, dst, mono16k=False):
     run(cmd)
 
 
+def to_mono16k(src_wav, dst_wav):
+    run(["ffmpeg", "-y", "-v", "error", "-i", str(src_wav),
+         "-ac", "1", "-ar", "16000", str(dst_wav)])
+
+
 def demucs_separate(wav_path, tmpdir):
     """Split audio into vocals + everything-else with Demucs (GPU if there).
 
@@ -134,8 +141,90 @@ def translate_to_english(wav_path, model_size, lang=None):
     print(f"  detected language: {info.language} "
           f"({info.language_probability:.0%}), {len(segs)} segments")
     del model
-    free_cuda()  # make room for the TTS model
+    free_cuda()  # make room for the next model
     return segs
+
+
+class SpeakerEmbedder:
+    """ECAPA-TDNN speaker embeddings (SpeechBrain, local, ungated)."""
+
+    def __init__(self):
+        import torch
+        from speechbrain.inference.speaker import EncoderClassifier
+        self.torch = torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.enc = EncoderClassifier.from_hparams(
+            source="speechbrain/spkrec-ecapa-voxceleb",
+            run_opts={"device": device})
+
+    def __call__(self, clip16k):
+        t = self.torch.from_numpy(clip16k).unsqueeze(0)
+        return self.enc.encode_batch(t).squeeze().cpu().numpy()
+
+
+def diarize(vocals16k_wav, segments, n_speakers=None):
+    """Assign a speaker label to every segment by clustering ECAPA
+    embeddings of the vocal stem. Returns (labels, n_found)."""
+    import numpy as np
+    import soundfile as sf
+    from sklearn.cluster import AgglomerativeClustering
+
+    print("  identifying speakers (ECAPA embeddings + clustering) ...")
+    audio, sr = sf.read(vocals16k_wav, dtype="float32")
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)
+
+    # embed every segment with usable audio; only segments long enough to
+    # give a stable embedding take part in the clustering itself
+    embedder = SpeakerEmbedder()
+    embeds, cluster_idx = {}, []
+    for i, (start, end, _) in enumerate(segments):
+        clip = audio[int(start * sr):int(end * sr)]
+        if clip.size < int(0.3 * sr):
+            continue
+        e = embedder(clip)
+        embeds[i] = e / (np.linalg.norm(e) + 1e-9)
+        if end - start >= EMBED_MIN_S:
+            cluster_idx.append(i)
+    del embedder
+    free_cuda()
+
+    labels = np.zeros(len(segments), dtype=int)
+    if len(cluster_idx) <= 1:
+        return labels.tolist(), 1
+
+    X = np.stack([embeds[i] for i in cluster_idx])
+    if n_speakers:
+        clus = AgglomerativeClustering(
+            n_clusters=min(n_speakers, len(X)),
+            metric="cosine", linkage="average")
+    else:
+        clus = AgglomerativeClustering(
+            n_clusters=None, distance_threshold=CLUSTER_THRESHOLD,
+            metric="cosine", linkage="average")
+    sub = clus.fit_predict(X)
+
+    labels[:] = -1
+    for i, lab in zip(cluster_idx, sub):
+        labels[i] = lab
+    centroids = {lab: np.mean([embeds[i] for i, l in zip(cluster_idx, sub)
+                               if l == lab], axis=0)
+                 for lab in set(sub)}
+    for i in range(len(segments)):
+        if labels[i] != -1:
+            continue
+        if i in embeds:  # short segment: nearest speaker by voice similarity
+            labels[i] = max(centroids, key=lambda lab:
+                            float(np.dot(embeds[i], centroids[lab])))
+        else:  # no usable audio at all: inherit the nearest labeled segment
+            nearest = min(cluster_idx, key=lambda j: abs(j - i))
+            labels[i] = labels[nearest]
+
+    n_found = len(set(sub))
+    counts = {lab: list(labels).count(lab) for lab in sorted(set(labels))}
+    print(f"  found {n_found} speaker(s): "
+          + ", ".join(f"S{lab}={n} segments" for lab, n in counts.items()))
+    return labels.tolist(), n_found
 
 
 class KokoroSynth:
@@ -159,12 +248,15 @@ class KokoroSynth:
 
 
 class CloneSynth:
-    """Zero-shot voice cloning via XTTS-v2: each segment's own original
-    audio is the voice reference for its English line, so whoever is
-    speaking at that moment is (approximately) the voice that speaks the
-    translation — no diarization needed."""
+    """Per-speaker voice cloning via XTTS-v2.
 
-    def __init__(self, vocals_wav, tmpdir):
+    One voice profile is built per detected speaker by pooling that
+    speaker's longest segments of the clean vocal stem, and its XTTS
+    conditioning latents are computed once and reused for every line the
+    speaker has — consistent voices, and much faster than re-cloning
+    per segment."""
+
+    def __init__(self, vocals_wav, segments, labels, tmpdir):
         import numpy as np
         import soundfile as sf
         os.environ.setdefault("COQUI_TOS_AGREED", "1")
@@ -176,36 +268,47 @@ class CloneSynth:
             device = "cpu"
         print(f"  loading XTTS-v2 voice-cloning TTS on {device} ...")
         self.tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
-        self.tmpdir = Path(tmpdir)
-        audio, self.sr = sf.read(vocals_wav, dtype="float32")
-        self.vocals = audio.mean(axis=1) if audio.ndim > 1 else audio
-        self.np, self.sf = np, sf
+        self.model = self.tts.synthesizer.tts_model
+        self.np = np
+        self.labels = labels
+        self.latents = {}
 
-    def _reference(self, i, start, end):
-        """Write a REF_MIN_S..REF_MAX_S window of original vocals around
-        the segment to use as the cloning reference."""
-        dur = end - start
-        if dur < REF_MIN_S:  # widen symmetrically to the minimum
-            pad = (REF_MIN_S - dur) / 2
-            start, end = start - pad, end + pad
-        end = min(end, start + REF_MAX_S)
-        total = self.vocals.size / self.sr
-        # shift (not truncate) the window when it runs past either edge
-        if start < 0:
-            end, start = min(end - start, total), 0
-        if end > total:
-            start, end = max(start - (end - total), 0), total
-        a, b = int(start * self.sr), int(end * self.sr)
-        ref = self.tmpdir / f"ref-{i}.wav"
-        self.sf.write(ref, self.vocals[a:b], self.sr)
-        return ref
+        audio, sr = sf.read(vocals_wav, dtype="float32")
+        vocals = audio.mean(axis=1) if audio.ndim > 1 else audio
+        self.refs = {}
+        for spk in sorted(set(labels)):
+            own = sorted(
+                (seg for seg, lab in zip(segments, labels) if lab == spk),
+                key=lambda s: s[1] - s[0], reverse=True)
+            paths, total = [], 0.0
+            for k, (start, end, _) in enumerate(own):
+                dur = min(end - start, REF_CLIP_MAX_S)
+                if dur < REF_CLIP_MIN_S and paths:
+                    break  # profile already has audio; skip scraps
+                a = int(start * sr)
+                b = a + int(dur * sr)
+                p = Path(tmpdir) / f"spk{spk}-ref{k}.wav"
+                sf.write(p, vocals[a:b], sr)
+                paths.append(str(p))
+                total += dur
+                if total >= REF_TOTAL_S or len(paths) >= 6:
+                    break
+            self.refs[spk] = paths
+            print(f"  speaker S{spk}: voice profile from "
+                  f"{len(paths)} clips ({total:.1f}s)")
+
+    def _speaker_latents(self, spk):
+        if spk not in self.latents:
+            self.latents[spk] = self.model.get_conditioning_latents(
+                audio_path=self.refs[spk])
+        return self.latents[spk]
 
     def __call__(self, text, i, start, end):
-        ref = self._reference(i, start, end)
-        try:
-            wav = self.tts.tts(text=text, speaker_wav=str(ref), language="en")
-        finally:
-            ref.unlink(missing_ok=True)
+        gpt_cond, spk_embed = self._speaker_latents(self.labels[i])
+        out = self.model.inference(text, "en", gpt_cond, spk_embed)
+        wav = out["wav"]
+        if hasattr(wav, "cpu"):
+            wav = wav.cpu().numpy()
         return self.np.asarray(wav, dtype="float32")
 
 
@@ -307,7 +410,7 @@ def dub_file(src, args):
     dst = Path(args.output) if args.output else src.with_name(
         f"{src.stem}.eng-dub{src.suffix}")
     duration = float(info["format"]["duration"])
-    mode = "clone" if args.clone else "narrator"
+    mode = "narrator" if args.narrator else "per-speaker clone"
     print(f"{src.name}: dubbing stream {track['index']} "
           f"({stream_lang(track)}) -> {dst.name} [{mode}]")
 
@@ -317,21 +420,7 @@ def dub_file(src, args):
         dub_wav = tmp / "dub.wav"
         mix_wav = tmp / "mix.wav"
 
-        if args.clone:
-            extract_audio(src, track["index"], full_wav)
-            vocals, background = demucs_separate(full_wav, tmp)
-            segments = translate_to_english(vocals, args.model, args.lang)
-            if not segments:
-                print(f"skip {src.name}: no speech found")
-                return
-            synth = CloneSynth(vocals, tmp)
-            build_dub_track(segments, duration, synth, tmp, dub_wav)
-            del synth
-            free_cuda()
-            print("  mixing cloned vocals over the background stem ...")
-            mix_over_background(background, dub_wav, mix_wav)
-            final_wav = mix_wav
-        else:
+        if args.narrator:
             asr_wav = tmp / "asr.wav"
             extract_audio(src, track["index"], asr_wav, mono16k=True)
             segments = translate_to_english(asr_wav, args.model, args.lang)
@@ -347,6 +436,23 @@ def dub_file(src, args):
                 extract_audio(src, track["index"], full_wav)
                 mix_with_bed(full_wav, dub_wav, mix_wav)
                 final_wav = mix_wav
+        else:
+            extract_audio(src, track["index"], full_wav)
+            vocals, background = demucs_separate(full_wav, tmp)
+            segments = translate_to_english(vocals, args.model, args.lang)
+            if not segments:
+                print(f"skip {src.name}: no speech found")
+                return
+            vocals16k = tmp / "vocals16k.wav"
+            to_mono16k(vocals, vocals16k)
+            labels, _ = diarize(vocals16k, segments, args.speakers)
+            synth = CloneSynth(vocals, segments, labels, tmp)
+            build_dub_track(segments, duration, synth, tmp, dub_wav)
+            del synth
+            free_cuda()
+            print("  mixing cloned vocals over the background stem ...")
+            mix_over_background(background, dub_wav, mix_wav)
+            final_wav = mix_wav
 
         print("  muxing into container ...")
         mux(src, final_wav, dst, len(streams))
@@ -355,12 +461,15 @@ def dub_file(src, args):
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Dub foreign audio tracks into English, locally.")
+        description="Dub foreign audio tracks into English, locally. "
+                    "Default: per-speaker voice cloning.")
     ap.add_argument("inputs", nargs="+",
                     help="video file(s) or a directory to scan")
-    ap.add_argument("--clone", action="store_true",
-                    help="voice-preserving mode: Demucs stem separation + "
-                         "XTTS-v2 zero-shot cloning of the original speakers")
+    ap.add_argument("--narrator", action="store_true",
+                    help="fast stock-voice mode instead of per-speaker cloning")
+    ap.add_argument("--speakers", type=int,
+                    help="pin the number of distinct speakers "
+                         "(default: detected automatically)")
     ap.add_argument("--model", default="small",
                     help="faster-whisper model size (tiny/base/small/medium/"
                          "large-v3, default: small)")
